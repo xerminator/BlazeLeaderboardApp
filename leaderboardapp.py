@@ -225,6 +225,8 @@ def Calculate(folder_path, games, progress_callback=None):
            "Number of Crewmates Ejected (Imposter Only)", "Critical Meeting Error", 
            "Kills", "Survivability", "Win Type"]
 
+    
+
     df = pd.DataFrame(columns=columns)
 
     base_path = Path(folder_path)
@@ -253,12 +255,25 @@ def Calculate(folder_path, games, progress_callback=None):
         try:
             #print(file[0])
             df_file = pd.read_csv(file[0])
+            df_file.columns = df_file.columns.str.strip()
+
 
             for _, row in df_file.iterrows():
                 row['Source.Name'] = Path(file[0]).stem
                 row_df = pd.DataFrame([row])
                 rows.append(row_df)
             df = pd.concat(rows, ignore_index=True)
+            
+            print(f"Columns in {filename}:")
+            print(df_file.columns.tolist())
+            df['Disconnected'] = df['Disconnected'].apply(lambda x: str(x).upper())
+            df['Alive at Last Meeting'] = df['Alive at Last Meeting'].apply(lambda x: str(x).upper())
+            df['First Two Victims R1'] = df['First Two Victims R1'].apply(lambda x: str(x).upper())
+            df['Critical Meeting Error'] = df['Critical Meeting Error'].apply(lambda x: str(x).upper())
+            # df['Disconnected'] = df['Disconnected'].str.upper()
+            # df['Alive At Last Meeting'] = df['Alive At Last Meeting'].str.upper()
+            # df['First Two Victims R1'] = df['First Two Victims R1'].str.upper()
+            # df['Critical Meeting Error'] = df['Critical Meeting Error'].str.upper()
             df.set_index('Source.Name', inplace=True)
         except Exception as e:
             print(f"Error: {e} \n File: {filename}")
