@@ -27,6 +27,6 @@ Then use the Games and Discard tabs to determine which of the located games you 
 If the scrollbar is not visible then just resize the program, but you can also scroll without the need of the scrollbar using the mouse scrollwheel.
 You can select multiple games at the time with the generic CTRL, Shift (default OS selecting items method).
 When you have the games that you want to calculate done just press the calculate button and it will make a new folder called calcs in the folder you have run the program in.
-In the calcs folder will be a file called leaderboard.xlxs which will contain all the data from the games you have selected in the program before clicking calculate.
+In the calcs folder will be a file called leaderboard.xlsx which will contain all the data from the games you have selected in the program before clicking calculate.
 
 
