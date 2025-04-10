@@ -3,6 +3,7 @@ import time
 from pathlib import Path
 from tkinter import ttk, filedialog
 import pandas as pd
+import StatsCalc
 
 class LeaderboardApp(tk.Tk):
     def __init__(self):
@@ -228,6 +229,8 @@ def Calculate(folder_path, games, progress_callback=None):
     
 
     df = pd.DataFrame(columns=columns)
+    #crewStats = StatsCalc.CrewmateCalc()
+
 
     base_path = Path(folder_path)
     all_files = []
@@ -246,6 +249,7 @@ def Calculate(folder_path, games, progress_callback=None):
     if progress_callback:
         progress_callback(0, total_files)
 
+    crewStats = StatsCalc.CrewmateCalc()
     #print(games)
     for idx, file in enumerate(sorted_files):
         filename = Path(file[0]).name
@@ -262,6 +266,7 @@ def Calculate(folder_path, games, progress_callback=None):
                 row['Source.Name'] = Path(file[0]).stem
                 row_df = pd.DataFrame([row])
                 rows.append(row_df)
+                crewStats.getCrewgames(row)
             df = pd.concat(rows, ignore_index=True)
             
             #print(f"Columns in {filename}:")
@@ -284,7 +289,16 @@ def Calculate(folder_path, games, progress_callback=None):
 
     with pd.ExcelWriter(excel_file, engine='xlsxwriter') as writer:
         df.to_excel(writer, sheet_name="season13", index="Source.Name")
-    
+        crewdf = crewStats.getCrewDf().drop(columns=["Total Tasks Completed"])
+        crewdf.to_excel(writer, sheet_name="stats", index="Name")
+
+        worksheet = writer.sheets["stats"]
+
+        max_row = crewdf.shape[0]
+        max_col = crewdf.shape[1] - 1
+
+        worksheet.autofilter(0, 0, max_row, max_col)
+
     if progress_callback:
         progress_callback(total_files, total_files)
         
