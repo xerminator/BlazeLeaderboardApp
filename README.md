@@ -14,7 +14,7 @@ Usage:
 
 Windows:
 
-Execute the .exe
+Execute the .exe (preferably as Admministrator)
 
 Linux:
 
