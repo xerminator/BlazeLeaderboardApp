@@ -4,6 +4,8 @@ from pathlib import Path
 from tkinter import ttk, filedialog
 import pandas as pd
 import StatsCalc
+from datetime import datetime
+import numpy as np
 
 class LeaderboardApp(tk.Tk):
     def __init__(self):
@@ -76,17 +78,30 @@ class BasePage(tk.Frame):
         base_path = Path(folder_path)
         all_files = []
 
+        # for file_path in base_path.rglob("*"):
+        #     if file_path.is_file():
+        #         try:
+        #             created = file_path.stat().st_ctime
+        #             all_files.append((file_path, created))
+        #         except Exception as e:
+        #             print(f"Skipping file due to error: {e}")
         for file_path in base_path.rglob("*"):
-            if file_path.is_file():
-                try:
-                    created = file_path.stat().st_ctime
-                    all_files.append((file_path, created))
-                except Exception as e:
-                    print(f"Skipping file due to error: {e}")
+            try:
+                if file_path.is_file():
+                    filename = file_path.name
+                    parsed_date = parse_date_from_filename(filename)
+                    if parsed_date:
+                        all_files.append((file_path, parsed_date))
+            except Exception as e:
+                print(f"Skipping file due to error: {e}")
+
+
+
         sorted_files = sorted(all_files, key=lambda x: x[1])
         for path_obj, ctime in sorted_files:
             filename = path_obj.name
-            human_time = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(ctime))
+            #human_time = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(ctime))
+            human_time = ctime.strftime('%Y-%m-%d %H:%M:%S')
             if (include_discarded and discard_word.lower() in filename.lower()) or \
                (not include_discarded and discard_word.lower() not in filename.lower()):
                 self.listbox.insert(tk.END, (filename , human_time))
@@ -216,89 +231,315 @@ class DiscardPage(BasePage):
         super().update_listbox(folder_path, discard_word, include_discarded=True)
 
 
-def Calculate(folder_path, games, progress_callback=None):
-    #print(games)
-    base_path = Path(folder_path)
+# def Calculate(folder_path, games, progress_callback=None):
+#     #print(games)
+#     base_path = Path(folder_path)
 
-    columns = ["Name", "Role", "Disconnected", "Correct Votes", "Incorrect Votes", 
-           "Correct Ejects", "Incorrect Ejects", "Tasks Completed", "Tasks Total", 
-           "Alive at Last Meeting", "First Two Victims R1", 
-           "Number of Crewmates Ejected (Imposter Only)", "Critical Meeting Error", 
-           "Kills", "Survivability", "Win Type"]
+#     columns = ["Name", "Role", "Disconnected", "Correct Votes", "Incorrect Votes", 
+#            "Correct Ejects", "Incorrect Ejects", "Tasks Completed", "Tasks Total", 
+#            "Alive at Last Meeting", "First Two Victims R1", 
+#            "Number of Crewmates Ejected (Imposter Only)", "Critical Meeting Error", 
+#            "Kills", "Survivability", "Win Type"]
 
     
 
-    df = pd.DataFrame(columns=columns)
-    #crewStats = StatsCalc.CrewmateCalc()
+#     df = pd.DataFrame(columns=columns)
+#     #crewStats = StatsCalc.CrewmateCalc()
 
 
+#     base_path = Path(folder_path)
+#     all_files = []
+
+#     for file_path in base_path.rglob("*"):
+#         try:
+#             if file_path.is_file():
+#                 filename = file_path.name
+#                 print(f"Processing File: {filename}")
+#                 parsed_date = parse_date_from_filename(filename)
+#                 if parsed_date:
+#                     all_files.append((file_path, parsed_date))
+#         except Exception as e:
+#             print(f"Skipping file due to error: {e}")
+
+#     sorted_files = sorted(all_files, key=lambda x: x[1])
+#     rows = []
+
+#     total_files = len(sorted_files)
+#     if progress_callback:
+#         progress_callback(0, total_files)
+
+#     crewStats = StatsCalc.CrewmateCalc()
+#     impStats = StatsCalc.ImpostorCalc()
+#     #print(games)
+#     for idx, file in enumerate(sorted_files):
+#         filename = Path(file[0]).name
+#         #print(f"{filename} \n")
+#         if filename not in games:
+#             continue
+#         try:
+#             #print(file[0])
+#             df_file = pd.read_csv(file[0])
+#             df_file.columns = df_file.columns.str.strip()
+
+
+#             for _, row in df_file.iterrows():
+#                 row['Source.Name'] = Path(file[0]).stem
+#                 row_df = pd.DataFrame([row])
+#                 rows.append(row_df)
+#                 crewStats.getCrewgames(row)
+#                 impStats.getImpGames(row)
+#             df = pd.concat(rows, ignore_index=True)
+            
+#             #print(f"Columns in {filename}:")
+#             #print(df_file.columns.tolist())
+#             df['Disconnected'] = df['Disconnected'].apply(lambda x: str(x).upper().strip())
+#             df['Alive at Last Meeting'] = df['Alive at Last Meeting'].apply(lambda x: str(x).upper().strip())
+#             df['First Two Victims R1'] = df['First Two Victims R1'].apply(lambda x: str(x).upper().strip())
+#             df['Critical Meeting Error'] = df['Critical Meeting Error'].apply(lambda x: str(x).upper().strip())
+#             # df['Disconnected'] = df['Disconnected'].str.upper()
+#             # df['Alive At Last Meeting'] = df['Alive At Last Meeting'].str.upper()
+#             # df['First Two Victims R1'] = df['First Two Victims R1'].str.upper()
+#             # df['Critical Meeting Error'] = df['Critical Meeting Error'].str.upper()
+#             df.set_index('Source.Name', inplace=True)
+#         except Exception as e:
+#             print(f"Error: {e} \n File: {filename}")
+#         if progress_callback:
+#             progress_callback(idx + 1, total_files)
+
+#     crewdf = crewStats.getCrewDf().drop(columns=["Total Tasks Completed"])
+#     imp_df = impStats.impdf
+#     all_stats = pd.merge(
+#         crewdf.add_suffix(" (crew)"),
+#         imp_df.add_suffix(" (imp)"),
+#         left_index=True,
+#         right_index=True,
+#         how='outer'
+#     ).fillna(0)    
+#     excel_file = f'{Path.cwd()}/calcs/leaderboard.xlsx'
+
+#     with pd.ExcelWriter(excel_file, engine='xlsxwriter') as writer:
+#         df.to_excel(writer, sheet_name="season13", index="Source.Name")
+        
+#         crewdf.to_excel(writer, sheet_name="crewstats", index="Name")
+        
+#         imp_df.to_excel(writer, sheet_name="impstats", index="Name")
+#         all_stats.to_excel(writer, sheet_name="allstats", index="Name")
+
+#         crewworksheet = writer.sheets["crewstats"]
+#         impworksheet = writer.sheets["impstats"]
+#         allworksheet = writer.sheets["allstats"]
+
+#         crewworksheet.autofilter(0, 0, crewdf.shape[0], crewdf.shape[1])
+#         impworksheet.autofilter(0, 0, imp_df.shape[0], imp_df.shape[1])
+#         allworksheet.autofilter(0,0, all_stats.shape[0], all_stats.shape[1])
+        
+#     if progress_callback:
+#         progress_callback(total_files, total_files)
+
+from pathlib import Path
+import pandas as pd
+from datetime import datetime
+
+def Calculate(folder_path, games, progress_callback=None):
     base_path = Path(folder_path)
-    all_files = []
+    columns = [
+        "Name", "Role", "Disconnected", "Correct Votes", "Incorrect Votes", 
+        "Correct Ejects", "Incorrect Ejects", "Tasks Completed", "Tasks Total", 
+        "Alive at Last Meeting", "First Two Victims R1", 
+        "Number of Crewmates Ejected (Imposter Only)", "Critical Meeting Error", 
+        "Kills", "Survivability", "Win Type"
+    ]
 
-    for file_path in base_path.rglob("*"):
-        if file_path.is_file():
-            try:
-                created = file_path.stat().st_ctime
-                all_files.append((file_path, created))
-            except Exception as e:
-                print(f"Skipping file due to error: {e}")
-    sorted_files = sorted(all_files, key=lambda x: x[1])
-    rows = []
+    df = pd.DataFrame(columns=columns)
+    print(f"Initialization Df: {df}")
 
-    total_files = len(sorted_files)
+    all_files = get_sorted_files(base_path)
+    total_files = len(all_files)
+    
     if progress_callback:
         progress_callback(0, total_files)
 
     crewStats = StatsCalc.CrewmateCalc()
-    #print(games)
-    for idx, file in enumerate(sorted_files):
-        filename = Path(file[0]).name
-        #print(f"{filename} \n")
-        if filename not in games:
+    impStats = StatsCalc.ImpostorCalc()
+
+    rows = []
+
+    for idx, (file_path, _) in enumerate(all_files):
+        print(f"Iterating: {Path(file_path).name}")
+        if Path(file_path).name not in games:
             continue
+
         try:
-            #print(file[0])
-            df_file = pd.read_csv(file[0])
+            print(f"Trying to read file: {file_path}")
+            df_file = pd.read_csv(file_path)
             df_file.columns = df_file.columns.str.strip()
 
+            #print(f"Columns in file: {df_file.columns}")
 
-            for _, row in df_file.iterrows():
-                row['Source.Name'] = Path(file[0]).stem
-                row_df = pd.DataFrame([row])
-                rows.append(row_df)
-                crewStats.getCrewgames(row)
-            df = pd.concat(rows, ignore_index=True)
-            
-            #print(f"Columns in {filename}:")
-            #print(df_file.columns.tolist())
-            df['Disconnected'] = df['Disconnected'].apply(lambda x: str(x).upper().strip())
-            df['Alive at Last Meeting'] = df['Alive at Last Meeting'].apply(lambda x: str(x).upper().strip())
-            df['First Two Victims R1'] = df['First Two Victims R1'].apply(lambda x: str(x).upper().strip())
-            df['Critical Meeting Error'] = df['Critical Meeting Error'].apply(lambda x: str(x).upper().strip())
-            # df['Disconnected'] = df['Disconnected'].str.upper()
-            # df['Alive At Last Meeting'] = df['Alive At Last Meeting'].str.upper()
-            # df['First Two Victims R1'] = df['First Two Victims R1'].str.upper()
-            # df['Critical Meeting Error'] = df['Critical Meeting Error'].str.upper()
-            df.set_index('Source.Name', inplace=True)
+            source_name = Path(file_path).stem
+            df_file['Source.Name'] = source_name
+
+            for _, values in df_file.iterrows():
+                #print(values)
+
+                processed_row = process_single_row(values, crewStats, impStats)
+                #print(f"Processed row: {processed_row}")
+
+                if not processed_row.empty:
+                    rows.append(processed_row)
+
+            if progress_callback:
+                progress_callback(idx + 1, total_files)
+
         except Exception as e:
-            print(f"Error: {e} \n File: {filename}")
-        if progress_callback:
-            progress_callback(idx + 1, total_files)
-    
-    excel_file = f'{Path.cwd()}/calcs/leaderboard.xlsx'
+            print(f"Iterating Error: {e}")
+            print(f"File: {Path(file_path).name}")
 
-    with pd.ExcelWriter(excel_file, engine='xlsxwriter') as writer:
-        df.to_excel(writer, sheet_name="season13", index="Source.Name")
-        crewdf = crewStats.getCrewDf().drop(columns=["Total Tasks Completed"])
-        crewdf.to_excel(writer, sheet_name="stats", index="Name")
+    print(f"Total rows to concatenate: {len(rows)}")
+    if len(rows) > 0:
+        print(f"First 5 rows of data being processed: {rows[:5]}")
+        df = pd.concat(rows, ignore_index=True)
+    else:
+        print("No rows to concatenate.")
+        df = pd.DataFrame(columns=columns)
+    df.set_index("Source.Name", inplace=True)
 
-        worksheet = writer.sheets["stats"]
-
-        max_row = crewdf.shape[0]
-        max_col = crewdf.shape[1] - 1
-
-        worksheet.autofilter(0, 0, max_row, max_col)
+    clean_column_data(df)
+    create_report(df, crewStats, impStats)
 
     if progress_callback:
         progress_callback(total_files, total_files)
+
+def get_sorted_files(base_path):
+    all_files = []
+    for file_path in base_path.rglob("*"):
+        if file_path.is_file():
+            try:
+                parsed_date = parse_date_from_filename(file_path.name)
+                if parsed_date:
+                    all_files.append((file_path, parsed_date))
+            except Exception as e:
+                print(f"Skipping file due to error: {e}")
+    return sorted(all_files, key=lambda x: x[1])
+
+def parse_date_from_filename(filename):
+    try:
+        base_part = filename.split(",")[0].strip()
+        base_part = base_part.replace("..", ".")
+        dt = datetime.strptime(base_part, "%b.%d.%H.%M")
+        dt = dt.replace(year=datetime.now().year)
+        return dt
+    except Exception as e:
+        print(f"Error parsing date from filename '{filename}': {e}")
+        return None
+
+def process_single_row(row, crewStats, impStats):
+    row_df = pd.DataFrame([row])
+    crewStats.getCrewgames(row_df)
+    impStats.getImpGames(row_df)
+    return row_df
+
+def clean_column_data(df):
+    columns_to_clean = ["Disconnected", "Alive at Last Meeting", "First Two Victims R1", "Critical Meeting Error"]
+    for column in columns_to_clean:
+        df[column] = df[column].apply(lambda x: str(x).upper().strip())
+
+def create_report(df, crewStats, impStats):
+    crewdf = crewStats.getCrewDf().drop(columns=["Total Tasks Completed"])
+    imp_df = impStats.impdf
+
+    # all_stats = pd.merge(
+    #     crewdf.add_suffix(" (crew)"),
+    #     imp_df.add_suffix(" (imp)"),
+    #     left_index=True,
+    #     right_index=True,
+    #     how='outer'
+    # ).fillna(0)
+    all_stats = pd.merge(
+        crewdf,
+        imp_df,
+        left_index=True,
+        right_index=True,
+        how='outer',
+        suffixes=(" (crew)", " (imp)")
+    ).fillna(0)
+
+
+    crewexclude_cols = ["Avg Task Compl.","CAP", "PPG"]
+    impexclude_cols = ["CAP", "PPG", "AKPG"]
+    allexclude_cols = ["PPG (crew)", "PPG (imp)", "AKPG", "CAP (crew)", "CAP (imp)", "Avg Task Compl"]
+
+    crewnumeric_cols = crewdf.select_dtypes(include=[np.number]).columns.difference(crewexclude_cols)
+    impnumeric_cols = imp_df.select_dtypes(include=[np.number]).columns.difference(impexclude_cols)
+    allnumeric_cols = all_stats.select_dtypes(include=[np.number]).columns.difference(allexclude_cols)
+
+    crewdf[crewnumeric_cols] = np.floor(crewdf[crewnumeric_cols]).astype(int)
+    imp_df[impnumeric_cols] = np.floor(imp_df[impnumeric_cols]).astype(int)
+    all_stats[allnumeric_cols] = np.floor(all_stats[allnumeric_cols]).astype(int)
+
+    crew_round_cols = [col for col in crewexclude_cols if col in crewdf.columns]
+    imp_round_cols = [col for col in impexclude_cols if col in imp_df.columns]
+    all_round_cols = [col for col in allexclude_cols if col in all_stats.columns]
+
+    crewdf[crew_round_cols] = crewdf[crew_round_cols].round(1)
+    imp_df[imp_round_cols] = imp_df[imp_round_cols].round(1)
+    all_stats[all_round_cols] = all_stats[all_round_cols].round(1)
+
+
+
+    excel_file = f'{Path.cwd()}/calcs/leaderboard.xlsx'
+    with pd.ExcelWriter(excel_file, engine='xlsxwriter') as writer:
+        df.to_excel(writer, sheet_name="season13", index="Source.Name")
+        crewdf.to_excel(writer, sheet_name="crewstats", index="Name")
+        imp_df.to_excel(writer, sheet_name="impstats", index="Name")
+        all_stats.to_excel(writer, sheet_name="allstats", index="Name")
+        add_autofilter(writer, crewdf, imp_df, all_stats)
+
+
+def add_autofilter(writer, crewdf, imp_df, all_stats):
+    crewworksheet = writer.sheets["crewstats"]
+    impworksheet = writer.sheets["impstats"]
+    allworksheet = writer.sheets["allstats"]
+
+    crewworksheet.autofilter(0, 0, crewdf.shape[0], crewdf.shape[1])
+    impworksheet.autofilter(0, 0, imp_df.shape[0], imp_df.shape[1])
+    allworksheet.autofilter(0, 0, all_stats.shape[0], all_stats.shape[1])
+
+
+
+
+# Month abbreviation mapping (Dutch -> English)
+MONTH_MAPPING = {
+    'jan': 'Jan', 'feb': 'Feb', 'mrt': 'Mar', 'apr': 'Apr', 'mei': 'May', 'jun': 'Jun',
+    'jul': 'Jul', 'aug': 'Aug', 'sep': 'Sep', 'okt': 'Oct', 'nov': 'Nov', 'dec': 'Dec'
+}
+
+def parse_date_from_filename(filename):
+    # Expected format: apr..01.07.51, diana, cara, ImpostorWin.csv
+    # We extract 'apr..01.07.51' and convert to datetime
+    try:
+        # Split filename and handle possible additional commas or unexpected characters
+        base_part = filename.split(",")[0].strip()
         
+        # Handle multiple periods like 'apr..01.07.51'
+        base_part = base_part.replace("..", ".")  # Replace '..' with '.'
+
+        # Extract month part and check if it's a Dutch abbreviation
+        month_abbr = base_part.split('.')[0].lower()  # Get the first part as the month
+        if month_abbr in MONTH_MAPPING:
+            base_part = base_part.replace(month_abbr, MONTH_MAPPING[month_abbr], 1)
+        
+        # Log the modified base_part for debugging
+        #print(f"Attempting to parse base_part: '{base_part}' from filename: '{filename}'")
+
+        # Check if the base_part looks like a valid date
+        dt = datetime.strptime(base_part, "%b.%d.%H.%M")
+
+        # Year isn't in the filename; assume current year
+        dt = dt.replace(year=datetime.now().year)
+
+        return dt
+    except Exception as e:
+        print(f"Error parsing date from filename '{filename}': {e}")
+        return None
+
