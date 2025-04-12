@@ -79,13 +79,6 @@ class BasePage(tk.Frame):
         base_path = Path(folder_path)
         all_files = []
 
-        # for file_path in base_path.rglob("*"):
-        #     if file_path.is_file():
-        #         try:
-        #             created = file_path.stat().st_ctime
-        #             all_files.append((file_path, created))
-        #         except Exception as e:
-        #             print(f"Skipping file due to error: {e}")
         for file_path in base_path.rglob("*"):
             try:
                 if file_path.is_file():
@@ -231,112 +224,6 @@ class DiscardPage(BasePage):
         # Call the base class update_listbox method, which will handle both filtering and displaying
         super().update_listbox(folder_path, discard_word, include_discarded=True)
 
-
-# def Calculate(folder_path, games, progress_callback=None):
-#     #print(games)
-#     base_path = Path(folder_path)
-
-#     columns = ["Name", "Role", "Disconnected", "Correct Votes", "Incorrect Votes", 
-#            "Correct Ejects", "Incorrect Ejects", "Tasks Completed", "Tasks Total", 
-#            "Alive at Last Meeting", "First Two Victims R1", 
-#            "Number of Crewmates Ejected (Imposter Only)", "Critical Meeting Error", 
-#            "Kills", "Survivability", "Win Type"]
-
-    
-
-#     df = pd.DataFrame(columns=columns)
-#     #crewStats = StatsCalc.CrewmateCalc()
-
-
-#     base_path = Path(folder_path)
-#     all_files = []
-
-#     for file_path in base_path.rglob("*"):
-#         try:
-#             if file_path.is_file():
-#                 filename = file_path.name
-#                 print(f"Processing File: {filename}")
-#                 parsed_date = parse_date_from_filename(filename)
-#                 if parsed_date:
-#                     all_files.append((file_path, parsed_date))
-#         except Exception as e:
-#             print(f"Skipping file due to error: {e}")
-
-#     sorted_files = sorted(all_files, key=lambda x: x[1])
-#     rows = []
-
-#     total_files = len(sorted_files)
-#     if progress_callback:
-#         progress_callback(0, total_files)
-
-#     crewStats = StatsCalc.CrewmateCalc()
-#     impStats = StatsCalc.ImpostorCalc()
-#     #print(games)
-#     for idx, file in enumerate(sorted_files):
-#         filename = Path(file[0]).name
-#         #print(f"{filename} \n")
-#         if filename not in games:
-#             continue
-#         try:
-#             #print(file[0])
-#             df_file = pd.read_csv(file[0])
-#             df_file.columns = df_file.columns.str.strip()
-
-
-#             for _, row in df_file.iterrows():
-#                 row['Source.Name'] = Path(file[0]).stem
-#                 row_df = pd.DataFrame([row])
-#                 rows.append(row_df)
-#                 crewStats.getCrewgames(row)
-#                 impStats.getImpGames(row)
-#             df = pd.concat(rows, ignore_index=True)
-            
-#             #print(f"Columns in {filename}:")
-#             #print(df_file.columns.tolist())
-#             df['Disconnected'] = df['Disconnected'].apply(lambda x: str(x).upper().strip())
-#             df['Alive at Last Meeting'] = df['Alive at Last Meeting'].apply(lambda x: str(x).upper().strip())
-#             df['First Two Victims R1'] = df['First Two Victims R1'].apply(lambda x: str(x).upper().strip())
-#             df['Critical Meeting Error'] = df['Critical Meeting Error'].apply(lambda x: str(x).upper().strip())
-#             # df['Disconnected'] = df['Disconnected'].str.upper()
-#             # df['Alive At Last Meeting'] = df['Alive At Last Meeting'].str.upper()
-#             # df['First Two Victims R1'] = df['First Two Victims R1'].str.upper()
-#             # df['Critical Meeting Error'] = df['Critical Meeting Error'].str.upper()
-#             df.set_index('Source.Name', inplace=True)
-#         except Exception as e:
-#             print(f"Error: {e} \n File: {filename}")
-#         if progress_callback:
-#             progress_callback(idx + 1, total_files)
-
-#     crewdf = crewStats.getCrewDf().drop(columns=["Total Tasks Completed"])
-#     imp_df = impStats.impdf
-#     all_stats = pd.merge(
-#         crewdf.add_suffix(" (crew)"),
-#         imp_df.add_suffix(" (imp)"),
-#         left_index=True,
-#         right_index=True,
-#         how='outer'
-#     ).fillna(0)    
-#     excel_file = f'{Path.cwd()}/calcs/leaderboard.xlsx'
-
-#     with pd.ExcelWriter(excel_file, engine='xlsxwriter') as writer:
-#         df.to_excel(writer, sheet_name="season13", index="Source.Name")
-        
-#         crewdf.to_excel(writer, sheet_name="crewstats", index="Name")
-        
-#         imp_df.to_excel(writer, sheet_name="impstats", index="Name")
-#         all_stats.to_excel(writer, sheet_name="allstats", index="Name")
-
-#         crewworksheet = writer.sheets["crewstats"]
-#         impworksheet = writer.sheets["impstats"]
-#         allworksheet = writer.sheets["allstats"]
-
-#         crewworksheet.autofilter(0, 0, crewdf.shape[0], crewdf.shape[1])
-#         impworksheet.autofilter(0, 0, imp_df.shape[0], imp_df.shape[1])
-#         allworksheet.autofilter(0,0, all_stats.shape[0], all_stats.shape[1])
-        
-#     if progress_callback:
-#         progress_callback(total_files, total_files)
-
 def Calculate(folder_path, games, progress_callback=None):
     base_path = Path(folder_path)
     columns = [
@@ -445,13 +332,6 @@ def create_report(df, crewStats, impStats):
     crewdf = crewStats.getCrewDf().drop(columns=["Total Tasks Completed"])
     imp_df = impStats.impdf
 
-    # all_stats = pd.merge(
-    #     crewdf.add_suffix(" (crew)"),
-    #     imp_df.add_suffix(" (imp)"),
-    #     left_index=True,
-    #     right_index=True,
-    #     how='outer'
-    # ).fillna(0)
     all_stats = pd.merge(
         crewdf,
         imp_df,
@@ -461,10 +341,12 @@ def create_report(df, crewStats, impStats):
         suffixes=(" (crew)", " (imp)")
     ).fillna(0)
 
+    all_stats["Games"] = all_stats["CrewGames"] + all_stats["ImpGames"]
+    all_stats["Final CAP"] = all_stats["CAP (crew)"] + all_stats["CAP (imp)"]
 
     crewexclude_cols = ["Avg Task Compl.","CAP", "PPG"]
     impexclude_cols = ["CAP", "PPG", "AKPG"]
-    allexclude_cols = ["PPG (crew)", "PPG (imp)", "AKPG", "CAP (crew)", "CAP (imp)", "Avg Task Compl"]
+    allexclude_cols = ["PPG (crew)", "PPG (imp)", "AKPG", "CAP (crew)", "CAP (imp)", "Avg Task Compl", "Final CAP"]
 
     crewnumeric_cols = crewdf.select_dtypes(include=[np.number]).columns.difference(crewexclude_cols)
     impnumeric_cols = imp_df.select_dtypes(include=[np.number]).columns.difference(impexclude_cols)
@@ -497,6 +379,10 @@ def add_autofilter(writer, crewdf, imp_df, all_stats):
     crewworksheet = writer.sheets["crewstats"]
     impworksheet = writer.sheets["impstats"]
     allworksheet = writer.sheets["allstats"]
+
+    print(crewdf.columns)
+    print(imp_df.columns)
+    print(all_stats.columns)
 
     crewworksheet.autofilter(0, 0, crewdf.shape[0], crewdf.shape[1])
     impworksheet.autofilter(0, 0, imp_df.shape[0], imp_df.shape[1])
@@ -534,42 +420,3 @@ def parse_date_from_filename(filename):
     except Exception as e:
         print(f"[Error parsing date] '{filename}': {e}")
         return None
-
-
-
-# Month abbreviation mapping (Dutch -> English)
-# MONTH_MAPPING = {
-#     'jan': 'Jan', 'feb': 'Feb', 'mrt': 'Mar', 'apr': 'Apr', 'mei': 'May', 'jun': 'Jun',
-#     'jul': 'Jul', 'aug': 'Aug', 'sep': 'Sep', 'okt': 'Oct', 'nov': 'Nov', 'dec': 'Dec'
-# }
-
-
-# def parse_date_from_filename(filename):
-#     # Expected format: apr..01.07.51, diana, cara, ImpostorWin.csv
-#     # We extract 'apr..01.07.51' and convert to datetime
-#     try:
-#         # Split filename and handle possible additional commas or unexpected characters
-#         base_part = filename.split(",")[0].strip()
-        
-#         # Handle multiple periods like 'apr..01.07.51'
-#         base_part = base_part.replace("..", ".")  # Replace '..' with '.'
-
-#         # Extract month part and check if it's a Dutch abbreviation
-#         month_abbr = base_part.split('.')[0].lower()  # Get the first part as the month
-#         if month_abbr in MONTH_MAPPING:
-#             base_part = base_part.replace(month_abbr, MONTH_MAPPING[month_abbr], 1)
-        
-#         # Log the modified base_part for debugging
-#         #print(f"Attempting to parse base_part: '{base_part}' from filename: '{filename}'")
-
-#         # Check if the base_part looks like a valid date
-#         dt = datetime.strptime(base_part, "%b.%d.%H.%M")
-
-#         # Year isn't in the filename; assume current year
-#         dt = dt.replace(year=datetime.now().year)
-
-#         return dt
-#     except Exception as e:
-#         print(f"Error parsing date from filename '{filename}': {e}")
-#         return None
-
