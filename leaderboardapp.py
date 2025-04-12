@@ -6,6 +6,7 @@ import pandas as pd
 import StatsCalc
 from datetime import datetime
 import numpy as np
+import dateparser
 
 class LeaderboardApp(tk.Tk):
     def __init__(self):
@@ -336,10 +337,6 @@ class DiscardPage(BasePage):
 #     if progress_callback:
 #         progress_callback(total_files, total_files)
 
-from pathlib import Path
-import pandas as pd
-from datetime import datetime
-
 def Calculate(folder_path, games, progress_callback=None):
     base_path = Path(folder_path)
     columns = [
@@ -506,40 +503,73 @@ def add_autofilter(writer, crewdf, imp_df, all_stats):
     allworksheet.autofilter(0, 0, all_stats.shape[0], all_stats.shape[1])
 
 
+import dateparser
+import re
+from datetime import datetime
+
+def parse_date_from_filename(filename):
+    try:
+        # Step 1: Extract the date portion (before the first comma)
+        date_str = filename.split(",")[0].strip()
+
+        # Step 2: Replace '..' with '.' and normalize spacing
+        date_str = date_str.replace("..", ".").replace("_", " ").strip()
+
+        # Step 3: Convert things like 'apr.01.07.51' -> 'apr 01 07:51'
+        # Match pattern: month.day.hour.minute
+        parts = date_str.split('.')
+        if len(parts) >= 4:
+            # Format as: 'month day hour:minute' -> easier for dateparser
+            date_str = f"{parts[0]} {parts[1]} {parts[2]}:{parts[3]}"
+
+        # Step 4: Parse using dateparser
+        dt = dateparser.parse(date_str, settings={
+            'PREFER_DATES_FROM': 'past',
+            'RELATIVE_BASE': datetime.now(),
+            'DATE_ORDER': 'DMY'
+        })
+
+        return dt
+
+    except Exception as e:
+        print(f"[Error parsing date] '{filename}': {e}")
+        return None
+
 
 
 # Month abbreviation mapping (Dutch -> English)
-MONTH_MAPPING = {
-    'jan': 'Jan', 'feb': 'Feb', 'mrt': 'Mar', 'apr': 'Apr', 'mei': 'May', 'jun': 'Jun',
-    'jul': 'Jul', 'aug': 'Aug', 'sep': 'Sep', 'okt': 'Oct', 'nov': 'Nov', 'dec': 'Dec'
-}
+# MONTH_MAPPING = {
+#     'jan': 'Jan', 'feb': 'Feb', 'mrt': 'Mar', 'apr': 'Apr', 'mei': 'May', 'jun': 'Jun',
+#     'jul': 'Jul', 'aug': 'Aug', 'sep': 'Sep', 'okt': 'Oct', 'nov': 'Nov', 'dec': 'Dec'
+# }
 
-def parse_date_from_filename(filename):
-    # Expected format: apr..01.07.51, diana, cara, ImpostorWin.csv
-    # We extract 'apr..01.07.51' and convert to datetime
-    try:
-        # Split filename and handle possible additional commas or unexpected characters
-        base_part = filename.split(",")[0].strip()
+
+# def parse_date_from_filename(filename):
+#     # Expected format: apr..01.07.51, diana, cara, ImpostorWin.csv
+#     # We extract 'apr..01.07.51' and convert to datetime
+#     try:
+#         # Split filename and handle possible additional commas or unexpected characters
+#         base_part = filename.split(",")[0].strip()
         
-        # Handle multiple periods like 'apr..01.07.51'
-        base_part = base_part.replace("..", ".")  # Replace '..' with '.'
+#         # Handle multiple periods like 'apr..01.07.51'
+#         base_part = base_part.replace("..", ".")  # Replace '..' with '.'
 
-        # Extract month part and check if it's a Dutch abbreviation
-        month_abbr = base_part.split('.')[0].lower()  # Get the first part as the month
-        if month_abbr in MONTH_MAPPING:
-            base_part = base_part.replace(month_abbr, MONTH_MAPPING[month_abbr], 1)
+#         # Extract month part and check if it's a Dutch abbreviation
+#         month_abbr = base_part.split('.')[0].lower()  # Get the first part as the month
+#         if month_abbr in MONTH_MAPPING:
+#             base_part = base_part.replace(month_abbr, MONTH_MAPPING[month_abbr], 1)
         
-        # Log the modified base_part for debugging
-        #print(f"Attempting to parse base_part: '{base_part}' from filename: '{filename}'")
+#         # Log the modified base_part for debugging
+#         #print(f"Attempting to parse base_part: '{base_part}' from filename: '{filename}'")
 
-        # Check if the base_part looks like a valid date
-        dt = datetime.strptime(base_part, "%b.%d.%H.%M")
+#         # Check if the base_part looks like a valid date
+#         dt = datetime.strptime(base_part, "%b.%d.%H.%M")
 
-        # Year isn't in the filename; assume current year
-        dt = dt.replace(year=datetime.now().year)
+#         # Year isn't in the filename; assume current year
+#         dt = dt.replace(year=datetime.now().year)
 
-        return dt
-    except Exception as e:
-        print(f"Error parsing date from filename '{filename}': {e}")
-        return None
+#         return dt
+#     except Exception as e:
+#         print(f"Error parsing date from filename '{filename}': {e}")
+#         return None
 
