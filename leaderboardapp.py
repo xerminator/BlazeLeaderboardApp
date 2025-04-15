@@ -385,8 +385,8 @@ def create_report(df, crewStats, impStats, lbStats):
 
     crewexclude_cols = ["Avg Task Compl.","CAP", "PPG"]
     impexclude_cols = ["CAP", "PPG", "AKPG"]
-    allexclude_cols = ["PPG (crew)", "PPG (imp)", "AKPG", "CAP (crew)", "CAP (imp)", "Avg Task Compl", "Final CAP"]
-    lbexclude_cols = ["CrewPPG", "ImpPPG", "AKPG", "CrewCAP", "ImpCAP", "Avg Task Compl", "Final CAP"]
+    allexclude_cols = ["PPG (crew)", "PPG (imp)", "AKPG", "CAP (crew)", "CAP (imp)", "Avg Task Compl.", "Final CAP"]
+    lbexclude_cols = ["CrewPPG", "ImpPPG", "AKPG", "CrewCAP", "ImpCAP", "Avg Task Compl.", "Final CAP"]
 
     crewnumeric_cols = crewdf.select_dtypes(include=[np.number]).columns.difference(crewexclude_cols)
     impnumeric_cols = imp_df.select_dtypes(include=[np.number]).columns.difference(impexclude_cols)
