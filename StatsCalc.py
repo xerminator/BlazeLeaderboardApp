@@ -1,6 +1,243 @@
 import pandas as pd
 from datetime import datetime
 
+class LeaderbordCalc:
+    def __init__(self):
+        self.leaderboardColumns = [
+            "CrewPoints", "CrewGames", "CrewPPG", "First Round Victim", 
+            "√ Eject", "x Eject", "Eject Voting Acc", "√ Indv", "x Indv", "Indv Voting Acc.",
+            "TCV", "Total V", "True VA", "Vote Farmer", "Critical Error", "Alive Last Meeting",
+            "Throw Rate", "Win Alv", "Loss Alv", "Win % Alv", "Task Bozo", "Avg Task Compl.",
+            "Task Wins", "CrewCAP", "ImpPoints", "ImpPPG", "Kills", "AKPG", "Kill Farmer", "Wins", "Losses", "ImpGames", "Win % Imp",
+            "ImpCAP", "Games", "Final CAP", "Total Tasks Completed", "Name"
+        ]
+        self.lb = pd.DataFrame(columns=self.leaderboardColumns)
+        self.lb.set_index("Name", inplace=True)
+
+    def getLeaderboardDf(self):
+        return self.lb
+    
+    def getLeaderboard(self, df, amount = 0):
+
+        if df.empty:
+            return
+        
+        if amount <= 0:
+            amount = 50
+
+        
+
+        row = df.iloc[0]
+        name = row['Name']
+
+        if name not in self.lb.index:
+            self.lb.loc[name] = {col: 0 for col in self.lb.columns}
+        
+
+        self.aggregate_player_stats(name, df, amount)
+    
+    def aggregate_player_stats(self, name, group, amount):
+        """
+        Aggregate stats for a player based on a single row.
+        """
+        row = group.iloc[0]
+
+        # Skip if not a Crewmate
+        #role = str(row["Role"]).strip().upper()
+        #if role != "CREWMATE":
+        #    return
+
+        # Aggregation dictionary
+        
+        print(f"Games: {self.lb.at[name, "Games"]} | Amount: {amount} | Name: {name}")
+        if self.lb.at[name, "Games"] >= amount:
+            return
+        
+        self.lb.at[name, "Games"] += 1
+
+        role = str(row["Role"]).strip().upper()
+        if role == "CREWMATE":
+            self.lb.at[name, "CrewGames"] += 1
+        else:
+            self.lb.at[name, "ImpGames"] += 1
+
+        aggregates = {
+            "correct_ejects": row["Correct Ejects"],
+            "incorrect_ejects": row["Incorrect Ejects"],
+            "correct_votes": row["Correct Votes"],
+            "incorrect_votes": row["Incorrect Votes"],
+            "first_victim": int(to_bool(row["First Two Victims R1"])),
+            "tasks_completed": row["Tasks Completed"],
+            "win_type": str(row["Win Type"]).strip().lower()
+        }
+
+        if to_bool(row["Critical Meeting Error"]):
+            self.lb.at[name, "Critical Error"] += 1
+
+        if to_bool(row["Alive at Last Meeting"]):
+            self.lb.at[name, "Alive Last Meeting"] += 1
+            self.update_win_stats(name, aggregates["win_type"])
+
+        #print(f"Aggregate Win_Type: {aggregates['win_type']}")
+        if aggregates["win_type"] == "taskwin":
+            self.lb.at[name, "Task Wins"] += 1
+
+        if row["Correct Votes"] >= 4:
+            self.lb.at[name, "Vote Farmer"] += 1
+
+        if row["Tasks Completed"] < 10 and aggregates["win_type"] == "timesup":
+            self.lb.at[name, "Task Bozo"] += 1
+
+        # Update player stats
+        self.update_player_stats(name, aggregates)
+
+        #Imp stats:
+        if role != "CREWMATE":
+            
+            # Process all relevant updates
+            #self._increment_game_count(name)
+            self._update_kills(name, row)
+            #self._update_ejects(name, row)
+            self._update_win_loss(name, row)
+            self._update_points(name)
+            self._calculate_derived_stats(name)
+            self._calculate_cap(name)
+
+    def update_win_stats(self, name, win_type):
+        if win_type in ["crewmatewin", "taskwin"]:
+            self.lb.at[name, "Win Alv"] += 1
+        elif win_type in ["impostorwin", "timesup", "reactorwin"]:
+            self.lb.at[name, "Loss Alv"] += 1
+
+    def update_player_stats(self, name, aggregates):
+        self.lb.at[name, "First Round Victim"] += aggregates["first_victim"]
+        self.lb.at[name, "√ Eject"] += aggregates["correct_ejects"]
+        self.lb.at[name, "x Eject"] += aggregates["incorrect_ejects"]
+        self.lb.at[name, "TCV"] += aggregates["correct_votes"]
+        self.lb.at[name, "Total V"] += aggregates["correct_votes"] + aggregates["incorrect_votes"]
+        self.lb.at[name, "√ Indv"] += aggregates["correct_votes"] - aggregates["correct_ejects"]
+        self.lb.at[name, "x Indv"] += aggregates["incorrect_votes"] - aggregates["incorrect_ejects"]
+        self.lb.at[name, "Total Tasks Completed"] += aggregates["tasks_completed"]
+
+        self.calculate_advanced_stats(name)
+
+    def calculate_advanced_stats(self, name):
+        total_votes = self.lb.at[name, "Total V"]
+        total_ejects = self.lb.at[name, "√ Eject"] + self.lb.at[name, "x Eject"]
+        total_indv = self.lb.at[name, "√ Indv"] + self.lb.at[name, "x Indv"]
+
+        self.update_accuracy(name, total_votes, total_ejects, total_indv)
+        self.calculate_points(name)
+        self.calculate_ppg(name)
+        self.calculate_task_avg(name)
+        self.calculate_throw_rate(name)
+        self.calculate_win_alv_percentage(name)
+        self.calculate_cap(name)
+        self._calculate_final_stats(name)
+
+    def update_accuracy(self, name, total_votes, total_ejects, total_indv):
+        if total_votes > 0:
+            self.lb.at[name, "True VA"] = round(self.lb.at[name, "TCV"] / total_votes * 100, 2)
+        if total_ejects > 0:
+            self.lb.at[name, "Eject Voting Acc"] = round(self.lb.at[name, "√ Eject"] / total_ejects * 100, 2)
+        if total_indv > 0:
+            self.lb.at[name, "Indv Voting Acc."] = round(self.lb.at[name, "√ Indv"] / total_indv * 100, 2)
+
+    def calculate_points(self, name):
+        points = (
+            self.lb.at[name, "√ Eject"] * 3
+            - self.lb.at[name, "x Eject"] * 2
+            + self.lb.at[name, "√ Indv"] * 1
+            - self.lb.at[name, "x Indv"] * 0.5
+            + self.lb.at[name, "First Round Victim"] * 0.5
+            + self.lb.at[name, "Task Wins"] * 3
+            - self.lb.at[name, "Critical Error"] * 6
+            - self.lb.at[name, "Task Bozo"] * 8
+        )
+        self.lb.at[name, "CrewPoints"] = round(points, 2)
+
+    def calculate_ppg(self, name):
+        crew_games = self.lb.at[name, "CrewGames"]
+        if crew_games > 0:
+            self.lb.at[name, "CrewPPG"] = round(self.lb.at[name, "CrewPoints"] / crew_games, 1)
+
+    def calculate_task_avg(self, name):
+        crew_games = self.lb.at[name, "CrewGames"]
+        total_tasks = self.lb.at[name, "Total Tasks Completed"]
+        if crew_games > 0:
+            self.lb.at[name, "Avg Task Compl."] = round(total_tasks / crew_games, 1)
+
+    def calculate_throw_rate(self, name):
+        """
+        Calculates how often a player made critical mistakes.
+        """
+        #games = self.crewdf.at[name, "CrewGames"]
+        alv_last_meeting = self.lb.at[name, "Alive Last Meeting"]
+        critical_errors = self.lb.at[name, "Critical Error"]
+        if alv_last_meeting > 0:
+            self.lb.at[name, "Throw Rate"] = round(critical_errors / alv_last_meeting * 100, 2)
+        
+    def calculate_win_alv_percentage(self, name):
+        total_alv = self.lb.at[name, "Win Alv"] + self.lb.at[name, "Loss Alv"]
+        print(f"Total Alive: {total_alv}")
+        if total_alv > 0:
+            self.lb.at[name, "Win % Alv"] = round(self.lb.at[name, "Win Alv"] / total_alv * 100, 2)
+
+    def calculate_cap(self, name):
+        cap = (
+            self.lb.at[name, "CrewPoints"] *
+            (self.lb.at[name, "True VA"] / 100) *
+            (self.lb.at[name, "Win % Alv"] / 100) *
+            ((100 - self.lb.at[name, "Throw Rate"]) / 100)
+        )
+        self.lb.at[name, "CrewCAP"] = round(cap, 1)
+
+    def _update_kills(self, name, row):
+        kills = row["Kills"]
+        self.lb.at[name, "Kills"] += kills
+        if kills >= 4:
+            self.lb.at[name, "Kill Farmer"] += 1
+
+    # def _update_ejects(self, name, row):
+    #     self.lb.at[name, "Ejects"] += row["Number of Crewmates Ejected (Imposter Only)"]
+
+    def _update_win_loss(self, name, row):
+        win_type = str(row["Win Type"]).strip().lower()
+        if win_type in ["impostorwin", "timesup", "reactorwin"]:
+            self.lb.at[name, "Wins"] += 1
+        else:
+            self.lb.at[name, "Losses"] += 1
+
+    def _update_points(self, name):
+        points = (
+            self.lb.at[name, "Wins"] * 5
+            - self.lb.at[name, "Losses"] * 0.5
+            + self.lb.at[name, "Kills"] * 0.25
+            #+ self.lb.at[name, "Ejects"] * 0.25
+        )
+        self.lb.at[name, "ImpPoints"] = round(points, 2)
+
+    def _calculate_derived_stats(self, name):
+        games = self.lb.at[name, "ImpGames"]
+
+        if games > 0:
+            self.lb.at[name, "ImpPPG"] = round(self.lb.at[name, "ImpPoints"] / games, 1)
+            self.lb.at[name, "AKPG"] = round(self.lb.at[name, "Kills"] / games, 1)
+            self.lb.at[name, "Win % Imp"] = round(self.lb.at[name, "Wins"] / games * 100, 2)
+    
+    def _calculate_cap(self, name):
+        cap = (
+            self.lb.at[name, "ImpPoints"] *
+            self.lb.at[name, "Win % Imp"] / 100
+        )
+        self.lb.at[name, "ImpCAP"] = round(cap, 1)
+    
+    def _calculate_final_stats(self, name):
+        cap = (
+            self.lb.at[name, "CrewCAP"] + self.lb.at[name, "ImpCAP"]
+        )
+        self.lb.at[name, "Final CAP"] = round(cap, 1)
+
 class CrewmateCalc:
     def __init__(self):
         self.crewColumns = [

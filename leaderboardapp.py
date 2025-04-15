@@ -7,6 +7,7 @@ import StatsCalc
 from datetime import datetime
 import numpy as np
 import dateparser
+import traceback
 
 class LeaderboardApp(tk.Tk):
     def __init__(self):
@@ -42,7 +43,7 @@ class LeaderboardApp(tk.Tk):
 
     def calculate(self, folder_path):
         self.main_page.reset_progress()
-        Calculate(folder_path, self.retrieve_games(), self.update_progress)
+        Calculate(folder_path, self.retrieve_games(), self.update_progress, self.main_page.entry_lb_games.get())
     
     def update_progress(self, value, maximum):
         self.main_page.update_progress(value, maximum)
@@ -132,6 +133,16 @@ class MainPage(tk.Frame):
             text="Select Folder",
             command=self.open_dir_dialog
         )
+        entry_frame = tk.Frame(self)
+        entry_frame.pack(pady=10)
+
+        entry_label = tk.Label(entry_frame, text="Leaderboard Games: ")
+        entry_label.pack(side="left")
+
+        self.entry_lb_games = tk.Entry(entry_frame)
+        self.entry_lb_games.insert(0, "50")
+        self.entry_lb_games.pack(side="left")
+
         open_dir_btn.pack(pady=10)
 
         calc_btn = tk.Button(
@@ -224,7 +235,8 @@ class DiscardPage(BasePage):
         # Call the base class update_listbox method, which will handle both filtering and displaying
         super().update_listbox(folder_path, discard_word, include_discarded=True)
 
-def Calculate(folder_path, games, progress_callback=None):
+def Calculate(folder_path, games, progress_callback=None, amount="50"):
+    amount = int(amount)
     base_path = Path(folder_path)
     columns = [
         "Name", "Role", "Disconnected", "Correct Votes", "Incorrect Votes", 
@@ -245,12 +257,16 @@ def Calculate(folder_path, games, progress_callback=None):
 
     crewStats = StatsCalc.CrewmateCalc()
     impStats = StatsCalc.ImpostorCalc()
+    lbStats = StatsCalc.LeaderbordCalc()
 
     rows = []
 
     for idx, (file_path, _) in enumerate(all_files):
         print(f"Iterating: {Path(file_path).name}")
+
         if Path(file_path).name not in games:
+            if progress_callback:
+                progress_callback(idx + 1, total_files)
             continue
 
         try:
@@ -271,6 +287,15 @@ def Calculate(folder_path, games, progress_callback=None):
 
                 if not processed_row.empty:
                     rows.append(processed_row)
+                
+            rev_idx = total_files - 1 - idx
+            rev_file_path, _ = all_files[rev_idx]
+            rev_df = pd.read_csv(rev_file_path)
+            rev_df.columns = rev_df.columns.str.strip()
+            #rev_df["Source.Name"] = Path(rev_file_path).stem
+
+            for _, row in rev_df.iterrows():
+                lbStats.getLeaderboard(pd.DataFrame([row]), amount)
 
             if progress_callback:
                 progress_callback(idx + 1, total_files)
@@ -278,6 +303,7 @@ def Calculate(folder_path, games, progress_callback=None):
         except Exception as e:
             print(f"Iterating Error: {e}")
             print(f"File: {Path(file_path).name}")
+            traceback.print_exc()
 
     print(f"Total rows to concatenate: {len(rows)}")
     if len(rows) > 0:
@@ -289,7 +315,7 @@ def Calculate(folder_path, games, progress_callback=None):
     df.set_index("Source.Name", inplace=True)
 
     clean_column_data(df)
-    create_report(df, crewStats, impStats)
+    create_report(df, crewStats, impStats, lbStats)
 
     if progress_callback:
         progress_callback(total_files, total_files)
@@ -318,19 +344,21 @@ def parse_date_from_filename(filename):
         return None
 
 def process_single_row(row, crewStats, impStats):
-    row_df = pd.DataFrame([row])
-    crewStats.getCrewgames(row_df)
-    impStats.getImpGames(row_df)
-    return row_df
+        row_df = pd.DataFrame([row])
+        crewStats.getCrewgames(row_df)
+        impStats.getImpGames(row_df)
+        return row_df
+        
 
 def clean_column_data(df):
     columns_to_clean = ["Disconnected", "Alive at Last Meeting", "First Two Victims R1", "Critical Meeting Error"]
     for column in columns_to_clean:
         df[column] = df[column].apply(lambda x: str(x).upper().strip())
 
-def create_report(df, crewStats, impStats):
+def create_report(df, crewStats, impStats, lbStats):
     crewdf = crewStats.getCrewDf().drop(columns=["Total Tasks Completed"])
     imp_df = impStats.impdf
+    lb_df = lbStats.getLeaderboardDf().drop(columns=["Total Tasks Completed"])
 
     all_stats = pd.merge(
         crewdf,
@@ -347,22 +375,28 @@ def create_report(df, crewStats, impStats):
     crewexclude_cols = ["Avg Task Compl.","CAP", "PPG"]
     impexclude_cols = ["CAP", "PPG", "AKPG"]
     allexclude_cols = ["PPG (crew)", "PPG (imp)", "AKPG", "CAP (crew)", "CAP (imp)", "Avg Task Compl", "Final CAP"]
+    lbexclude_cols = ["CrewPPG", "ImpPPG", "AKPG", "CrewCAP", "ImpCAP", "Avg Task Compl", "Final CAP"]
 
     crewnumeric_cols = crewdf.select_dtypes(include=[np.number]).columns.difference(crewexclude_cols)
     impnumeric_cols = imp_df.select_dtypes(include=[np.number]).columns.difference(impexclude_cols)
     allnumeric_cols = all_stats.select_dtypes(include=[np.number]).columns.difference(allexclude_cols)
+    lbnumeric_cols = lb_df.select_dtypes(include=[np.number]).columns.difference(lbexclude_cols)
 
     crewdf[crewnumeric_cols] = np.floor(crewdf[crewnumeric_cols]).astype(int)
     imp_df[impnumeric_cols] = np.floor(imp_df[impnumeric_cols]).astype(int)
     all_stats[allnumeric_cols] = np.floor(all_stats[allnumeric_cols]).astype(int)
+    lb_df[lbnumeric_cols] = np.floor(lb_df[lbnumeric_cols]).astype(int)
 
     crew_round_cols = [col for col in crewexclude_cols if col in crewdf.columns]
     imp_round_cols = [col for col in impexclude_cols if col in imp_df.columns]
     all_round_cols = [col for col in allexclude_cols if col in all_stats.columns]
+    lb_round_cols = [col for col in lbexclude_cols if col in lb_df.columns]
+   
 
     crewdf[crew_round_cols] = crewdf[crew_round_cols].round(1)
     imp_df[imp_round_cols] = imp_df[imp_round_cols].round(1)
     all_stats[all_round_cols] = all_stats[all_round_cols].round(1)
+    lb_df[lb_round_cols] = lb_df[lb_round_cols].round(1)
 
 
 
@@ -372,26 +406,24 @@ def create_report(df, crewStats, impStats):
         crewdf.to_excel(writer, sheet_name="crewstats", index="Name")
         imp_df.to_excel(writer, sheet_name="impstats", index="Name")
         all_stats.to_excel(writer, sheet_name="allstats", index="Name")
-        add_autofilter(writer, crewdf, imp_df, all_stats)
+        lb_df.to_excel(writer, sheet_name="leaderboard", index="Final CAP")
+        add_autofilter(writer, crewdf, imp_df, all_stats, lb_df)
 
 
-def add_autofilter(writer, crewdf, imp_df, all_stats):
+def add_autofilter(writer, crewdf, imp_df, all_stats, lb_df):
     crewworksheet = writer.sheets["crewstats"]
     impworksheet = writer.sheets["impstats"]
     allworksheet = writer.sheets["allstats"]
+    lbworksheet = writer.sheets["leaderboard"]
 
-    print(crewdf.columns)
-    print(imp_df.columns)
-    print(all_stats.columns)
+    # print(crewdf.columns)
+    # print(imp_df.columns)
+    # print(all_stats.columns)
 
     crewworksheet.autofilter(0, 0, crewdf.shape[0], crewdf.shape[1])
     impworksheet.autofilter(0, 0, imp_df.shape[0], imp_df.shape[1])
     allworksheet.autofilter(0, 0, all_stats.shape[0], all_stats.shape[1])
-
-
-import dateparser
-import re
-from datetime import datetime
+    lbworksheet.autofilter(0, 0, lb_df.shape[0], lb_df.shape[1])
 
 def parse_date_from_filename(filename):
     try:
