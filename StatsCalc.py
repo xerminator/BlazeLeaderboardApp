@@ -17,16 +17,11 @@ class LeaderbordCalc:
     def getLeaderboardDf(self):
         return self.lb
     
-    def getLeaderboard(self, df, amount = 0):
+    def getLeaderboard(self, df, amountcrew = 0, amountimp = 0):
 
         if df.empty:
             return
         
-        if amount <= 0:
-            amount = 50
-
-        
-
         row = df.iloc[0]
         name = row['Name']
 
@@ -34,9 +29,9 @@ class LeaderbordCalc:
             self.lb.loc[name] = {col: 0 for col in self.lb.columns}
         
 
-        self.aggregate_player_stats(name, df, amount)
+        self.aggregate_player_stats(name, df, amountcrew, amountimp)
     
-    def aggregate_player_stats(self, name, group, amount):
+    def aggregate_player_stats(self, name, group, amountcrew, amountimp):
         """
         Aggregate stats for a player based on a single row.
         """
@@ -49,18 +44,23 @@ class LeaderbordCalc:
 
         # Aggregation dictionary
         
-        print(f"Games: {self.lb.at[name, "Games"]} | Amount: {amount} | Name: {name}")
-        if self.lb.at[name, "Games"] >= amount:
-            return
+        #print(f"Games: {self.lb.at[name, "Games"]} | Amount: {amountcrew} | Name: {name}")
+        # if self.lb.at[name, "Games"] >= amount:
+        #     return
         
-        self.lb.at[name, "Games"] += 1
+        #self.lb.at[name, "Games"] += 1
 
         role = str(row["Role"]).strip().upper()
         if role == "CREWMATE":
+            if self.lb.at[name, "CrewGames"] >= amountcrew:
+                return
             self.lb.at[name, "CrewGames"] += 1
         else:
+            if self.lb.at[name, "ImpGames"] >= amountimp:
+                return
             self.lb.at[name, "ImpGames"] += 1
-
+            
+        self.lb.at[name, "Games"] += 1
         aggregates = {
             "correct_ejects": row["Correct Ejects"],
             "incorrect_ejects": row["Incorrect Ejects"],
@@ -93,7 +93,7 @@ class LeaderbordCalc:
 
         #Imp stats:
         if role != "CREWMATE":
-            
+
             # Process all relevant updates
             #self._increment_game_count(name)
             self._update_kills(name, row)

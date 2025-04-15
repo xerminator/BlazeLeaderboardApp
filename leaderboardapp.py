@@ -43,7 +43,7 @@ class LeaderboardApp(tk.Tk):
 
     def calculate(self, folder_path):
         self.main_page.reset_progress()
-        Calculate(folder_path, self.retrieve_games(), self.update_progress, self.main_page.entry_lb_games.get())
+        Calculate(folder_path, self.retrieve_games(), self.update_progress, self.main_page.crewentry_lb_games.get(), self.main_page.impentry_lb_games.get())
     
     def update_progress(self, value, maximum):
         self.main_page.update_progress(value, maximum)
@@ -133,15 +133,25 @@ class MainPage(tk.Frame):
             text="Select Folder",
             command=self.open_dir_dialog
         )
-        entry_frame = tk.Frame(self)
-        entry_frame.pack(pady=10)
+        crewentry_frame = tk.Frame(self)
+        crewentry_frame.pack(pady=10)
 
-        entry_label = tk.Label(entry_frame, text="Leaderboard Games: ")
-        entry_label.pack(side="left")
+        impentry_frame = tk.Frame(self)
+        impentry_frame.pack(pady=10)
 
-        self.entry_lb_games = tk.Entry(entry_frame)
-        self.entry_lb_games.insert(0, "50")
-        self.entry_lb_games.pack(side="left")
+        crewentry_label = tk.Label(crewentry_frame, text="Leaderboard Crew Games: ")
+        crewentry_label.pack(side="left")
+
+        self.crewentry_lb_games = tk.Entry(crewentry_frame)
+        self.crewentry_lb_games.insert(0, "50")
+        self.crewentry_lb_games.pack(side="left")
+
+        impentry_label = tk.Label(impentry_frame, text="Leaderboard Imp Games: ")
+        impentry_label.pack(side="left")
+
+        self.impentry_lb_games = tk.Entry(impentry_frame)
+        self.impentry_lb_games.insert(0, "50")
+        self.impentry_lb_games.pack(side="left")
 
         open_dir_btn.pack(pady=10)
 
@@ -235,8 +245,9 @@ class DiscardPage(BasePage):
         # Call the base class update_listbox method, which will handle both filtering and displaying
         super().update_listbox(folder_path, discard_word, include_discarded=True)
 
-def Calculate(folder_path, games, progress_callback=None, amount="50"):
-    amount = int(amount)
+def Calculate(folder_path, games, progress_callback=None, amountcrew="50", amountimp="50"):
+    amountcrew = int(amountcrew)
+    amountimp = int(amountimp)
     base_path = Path(folder_path)
     columns = [
         "Name", "Role", "Disconnected", "Correct Votes", "Incorrect Votes", 
@@ -295,7 +306,7 @@ def Calculate(folder_path, games, progress_callback=None, amount="50"):
             #rev_df["Source.Name"] = Path(rev_file_path).stem
 
             for _, row in rev_df.iterrows():
-                lbStats.getLeaderboard(pd.DataFrame([row]), amount)
+                lbStats.getLeaderboard(pd.DataFrame([row]), amountcrew, amountimp)
 
             if progress_callback:
                 progress_callback(idx + 1, total_files)
