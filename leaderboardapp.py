@@ -269,16 +269,21 @@ def Calculate(folder_path, games, progress_callback=None, amountcrew="50", amoun
     crewStats = StatsCalc.CrewmateCalc()
     impStats = StatsCalc.ImpostorCalc()
     lbStats = StatsCalc.LeaderbordCalc()
+    processed_files_allstats = set()
+    processed_files_lb = set()
 
     rows = []
+    current_progress = 0
 
     for idx, (file_path, _) in enumerate(all_files):
         print(f"Iterating: {Path(file_path).name}")
 
         if Path(file_path).name not in games:
+            print(f"{Path(file_path).name} is not in games, skipping")
             if progress_callback:
-                progress_callback(idx + 1, total_files)
-            continue
+                current_progress += 1
+                progress_callback(current_progress, total_files * 2)
+                continue
 
         try:
             print(f"Trying to read file: {file_path}")
@@ -298,38 +303,59 @@ def Calculate(folder_path, games, progress_callback=None, amountcrew="50", amoun
 
                 if not processed_row.empty:
                     rows.append(processed_row)
-                
-            rev_idx = total_files - 1 - idx
-            rev_file_path, _ = all_files[rev_idx]
-            rev_df = pd.read_csv(rev_file_path)
-            rev_df.columns = rev_df.columns.str.strip()
-            #rev_df["Source.Name"] = Path(rev_file_path).stem
-
-            for _, row in rev_df.iterrows():
-                lbStats.getLeaderboard(pd.DataFrame([row]), amountcrew, amountimp)
-
-            if progress_callback:
-                progress_callback(idx + 1, total_files)
-
+            processed_files_allstats.add(Path(file_path).name)
+            current_progress += 1
         except Exception as e:
             print(f"Iterating Error: {e}")
             print(f"File: {Path(file_path).name}")
             traceback.print_exc()
+            
+        if progress_callback:
+            progress_callback(current_progress, total_files * 2)
 
-    print(f"Total rows to concatenate: {len(rows)}")
+    for idx, (file_path, _) in enumerate(reversed(all_files)):
+        print(f"Reverse Iterating: {Path(file_path).name}")
+
+        if Path(file_path).name not in games:
+            print(f"{Path(file_path).name} is not in games, skipping")
+            if progress_callback:
+                current_progress += 1
+                progress_callback(current_progress, total_files * 2)
+                continue
+        try:
+
+            rev_df = pd.read_csv(file_path)
+            rev_df.columns = rev_df.columns.str.strip()
+
+            for _, row in rev_df.iterrows():
+                lbStats.getLeaderboard(pd.DataFrame([row]), amountcrew, amountimp)
+            processed_files_lb.add(Path(file_path).name)
+            current_progress += 1
+
+        except Exception as e:
+            print(f"Reverse Iterating Error: {e}")
+            print(f"File: {Path(file_path).name}")
+            traceback.print_exc()
+    
+        if progress_callback:
+            progress_callback(current_progress, total_files * 2)
+        
+        #print(f"Total rows to concatenate: {len(rows)}")
     if len(rows) > 0:
-        print(f"First 5 rows of data being processed: {rows[:5]}")
+        #print(f"First 5 rows of data being processed: {rows[:5]}")
         df = pd.concat(rows, ignore_index=True)
-    else:
-        print("No rows to concatenate.")
-        df = pd.DataFrame(columns=columns)
-    df.set_index("Source.Name", inplace=True)
 
+    else:
+        #print("No rows to concatenate.")
+        df = pd.DataFrame(columns=columns)
+        df.columns.append("Source.Name")
+
+    df.set_index("Source.Name", inplace=True)
     clean_column_data(df)
     create_report(df, crewStats, impStats, lbStats)
+    print(f"allStats Count: {len(processed_files_allstats)} | Leaderboard count: {len(processed_files_lb)}")
 
-    if progress_callback:
-        progress_callback(total_files, total_files)
+    
 
 def get_sorted_files(base_path):
     all_files = []

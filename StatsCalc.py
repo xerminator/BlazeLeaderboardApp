@@ -14,6 +14,17 @@ class LeaderbordCalc:
         self.lb = pd.DataFrame(columns=self.leaderboardColumns)
         self.lb.set_index("Name", inplace=True)
 
+        # Ensure proper types for numeric columns
+        numeric_columns = [
+            "CrewPoints", "CrewGames", "CrewPPG", "First Round Victim", 
+            "√ Eject", "x Eject", "Eject Voting Acc", "√ Indv", "x Indv", "Indv Voting Acc.",
+            "TCV", "Total V", "True VA", "Vote Farmer", "Critical Error", "Alive Last Meeting",
+            "Throw Rate", "Win Alv", "Loss Alv", "Win % Alv", "Task Bozo", "Avg Task Compl.",
+            "Task Wins", "CrewCAP", "ImpPoints", "ImpPPG", "Kills", "AKPG", "Kill Farmer", "Wins", "Losses", "ImpGames", "Win % Imp",
+            "ImpCAP", "Games", "Final CAP", "Total Tasks Completed"
+        ]
+        self.lb[numeric_columns] = self.lb[numeric_columns].apply(pd.to_numeric, errors='coerce')
+
     def getLeaderboardDf(self):
         return self.lb
     
@@ -36,19 +47,6 @@ class LeaderbordCalc:
         Aggregate stats for a player based on a single row.
         """
         row = group.iloc[0]
-
-        # Skip if not a Crewmate
-        #role = str(row["Role"]).strip().upper()
-        #if role != "CREWMATE":
-        #    return
-
-        # Aggregation dictionary
-        
-        #print(f"Games: {self.lb.at[name, "Games"]} | Amount: {amountcrew} | Name: {name}")
-        # if self.lb.at[name, "Games"] >= amount:
-        #     return
-        
-        #self.lb.at[name, "Games"] += 1
 
         role = str(row["Role"]).strip().upper()
         if role == "CREWMATE":
@@ -179,7 +177,7 @@ class LeaderbordCalc:
         
     def calculate_win_alv_percentage(self, name):
         total_alv = self.lb.at[name, "Win Alv"] + self.lb.at[name, "Loss Alv"]
-        print(f"Total Alive: {total_alv}")
+        #print(f"Total Alive: {total_alv}")
         if total_alv > 0:
             self.lb.at[name, "Win % Alv"] = round(self.lb.at[name, "Win Alv"] / total_alv * 100, 2)
 
@@ -247,8 +245,18 @@ class CrewmateCalc:
             "Win Alv", "Loss Alv", "Task Bozo", "Avg Task Compl.", "Task Wins", "Points",
             "CAP", "Total Tasks Completed", "Win % Alv"
         ]
+
+        # Ensure proper types for numeric columns
+        self.numeric_columns = [
+            "CrewGames", "PPG", "First Round Victim", "√ Eject", "x Eject", "Eject Voting Acc",
+            "√ Indv", "x Indv", "Indv Voting Acc.", "TCV", "Total V", "True VA", "Vote Farmer",
+            "Critical Error", "Alv Last Meeting", "Throw Rate", "Win Alv", "Loss Alv", "Task Bozo",
+            "Avg Task Compl.", "Task Wins", "Points", "CAP", "Total Tasks Completed", "Win % Alv"
+        ]
+
         self.crewdf = pd.DataFrame(columns=self.crewColumns)
         self.crewdf.set_index("Name", inplace=True)
+        self.crewdf[self.numeric_columns] = self.crewdf[self.numeric_columns].apply(pd.to_numeric, errors='coerce')
 
     def getCrewDf(self):
         return self.crewdf
@@ -391,7 +399,7 @@ class CrewmateCalc:
         
     def calculate_win_alv_percentage(self, name):
         total_alv = self.crewdf.at[name, "Win Alv"] + self.crewdf.at[name, "Loss Alv"]
-        print(f"Total Alive: {total_alv}")
+        #print(f"Total Alive: {total_alv}")
         if total_alv > 0:
             self.crewdf.at[name, "Win % Alv"] = round(self.crewdf.at[name, "Win Alv"] / total_alv * 100, 2)
 
@@ -410,8 +418,15 @@ class ImpostorCalc:
             "Name", "PPG", "Kills", "AKPG", "Ejects", "Kill Farmer",
             "Wins", "Losses", "ImpGames", "Win % Imp", "CAP", "Points"
         ]
+
+        # Ensure proper types for numeric columns
+        self.numeric_columns = [
+            "PPG", "Kills", "AKPG", "Ejects", "Kill Farmer", "Wins", "Losses", "ImpGames", "Win % Imp", "CAP", "Points" 
+        ]
+
         self.impdf = pd.DataFrame(columns=self.columns)
         self.impdf.set_index("Name", inplace=True)
+        self.impdf[self.numeric_columns] = self.impdf[self.numeric_columns].apply(pd.to_numeric, errors='coerce')
 
     def getImpGames(self, df):
         """
