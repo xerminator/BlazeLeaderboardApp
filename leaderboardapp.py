@@ -446,7 +446,30 @@ def create_report(df, crewStats, impStats, lbStats):
         "Points (imp)": "ImpPoints",
         "CAP (imp)": "ImpCAP"
     }, inplace=True)
-    all_stats.drop(columns=["Ejects"])
+    all_stats.drop(columns=["Ejects"], inplace=True)
+
+    percent_cols_crew = [
+        'Eject Voting Acc',
+        'Indv Voting Acc',
+        'True VA',
+        'Throw Rate',
+        'Win % Alv'
+    ]
+    percent_cols_imp = [
+        'Win % Imp'
+    ]
+    percent_cols_all = [
+        'Eject Voting Acc',
+        'Indv Voting Acc',
+        'True VA',
+        'Throw Rate',
+        'Win % Alv',
+        'Win %'
+    ]
+    convert_percent_columns(crewdf, percent_cols_crew)
+    convert_percent_columns(imp_df, percent_cols_imp)
+    convert_percent_columns(all_stats, percent_cols_all)
+    convert_percent_columns(lb_df, percent_cols_all)
 
     excel_file = f'{Path.cwd()}/calcs/leaderboard.xlsx'
     with pd.ExcelWriter(excel_file, engine='xlsxwriter') as writer:
@@ -455,7 +478,26 @@ def create_report(df, crewStats, impStats, lbStats):
         imp_df.to_excel(writer, sheet_name="impstats", index="Name")
         all_stats.to_excel(writer, sheet_name="allstats", index="Name")
         lb_df.to_excel(writer, sheet_name="leaderboard", index="Final CAP")
+        apply_percent_format(writer, crewdf, 'crewstats', percent_cols_crew)
+        apply_percent_format(writer, imp_df, 'impstats', percent_cols_imp)
+        apply_percent_format(writer, all_stats, 'allstats', percent_cols_all)
+        apply_percent_format(writer, lb_df, 'leaderboard', percent_cols_all)
+
         add_autofilter(writer, crewdf, imp_df, all_stats, lb_df)
+
+def convert_percent_columns(df, percent_cols):
+    for col in percent_cols:
+        if col in df.columns and df[col].max() > 1:
+            df[col] = df[col] / 100
+
+def apply_percent_format(writer, df, sheet_name, percent_cols):
+    workbook = writer.book
+    worksheet = writer.sheets[sheet_name]
+    percent_fmt = workbook.add_format({'num_format': '0%'})
+
+    for idx, col in enumerate(df.columns, start=1):  # +1 because column A is index
+        if col in percent_cols:
+            worksheet.set_column(idx, idx, 12, percent_fmt)
 
 
 def add_autofilter(writer, crewdf, imp_df, all_stats, lb_df):
