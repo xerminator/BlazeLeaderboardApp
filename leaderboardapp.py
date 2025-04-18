@@ -482,6 +482,12 @@ def create_report(df, crewStats, impStats, lbStats):
         apply_percent_format(writer, imp_df, 'impstats', percent_cols_imp)
         apply_percent_format(writer, all_stats, 'allstats', percent_cols_all)
         apply_percent_format(writer, lb_df, 'leaderboard', percent_cols_all)
+        
+        # Auto adjust column widths
+        auto_adjust_column_widths(writer, crewdf, "crewstats")
+        auto_adjust_column_widths(writer, imp_df, "impstats")
+        auto_adjust_column_widths(writer, all_stats, "allstats")
+        auto_adjust_column_widths(writer, lb_df, "leaderboard")
 
         add_autofilter(writer, crewdf, imp_df, all_stats, lb_df)
 
@@ -489,6 +495,20 @@ def convert_percent_columns(df, percent_cols):
     for col in percent_cols:
         if col in df.columns and df[col].max() > 1:
             df[col] = df[col] / 100
+
+def auto_adjust_column_widths(writer, df, sheet_name):
+    worksheet = writer.sheets[sheet_name]
+
+    # Handle index (column 0)
+    index_col_width = max([len(str(s)) for s in df.index.values] + [len(df.index.name or "")]) + 2
+    worksheet.set_column(0, 0, index_col_width)
+
+    # Handle data columns
+    for i, col in enumerate(df.columns):
+        col_data = df[col].astype(str).values
+        max_len = max([len(str(s)) for s in col_data] + [len(col)]) + 2  # padding
+        worksheet.set_column(i + 1, i + 1, max_len)
+
 
 def apply_percent_format(writer, df, sheet_name, percent_cols):
     workbook = writer.book
