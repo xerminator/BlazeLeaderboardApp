@@ -59,38 +59,40 @@ class LeaderbordCalc:
             self.lb.at[name, "ImpGames"] += 1
             
         self.lb.at[name, "Games"] += 1
-        aggregates = {
-            "correct_ejects": row["Correct Ejects"],
-            "incorrect_ejects": row["Incorrect Ejects"],
-            "correct_votes": row["Correct Votes"],
-            "incorrect_votes": row["Incorrect Votes"],
-            "first_victim": int(to_bool(row["First Two Victims R1"])),
-            "tasks_completed": row["Tasks Completed"],
-            "win_type": str(row["Win Type"]).strip().lower()
-        }
 
-        if to_bool(row["Critical Meeting Error"]):
-            self.lb.at[name, "Critical Error"] += 1
+        if role == "CREWMATE":
+            aggregates = {
+                "correct_ejects": row["Correct Ejects"],
+                "incorrect_ejects": row["Incorrect Ejects"],
+                "correct_votes": row["Correct Votes"],
+                "incorrect_votes": row["Incorrect Votes"],
+                "first_victim": int(to_bool(row["First Two Victims R1"])),
+                "tasks_completed": row["Tasks Completed"],
+                "win_type": str(row["Win Type"]).strip().lower()
+            }
 
-        if to_bool(row["Alive at Last Meeting"]):
-            self.lb.at[name, "Alive Last Meeting"] += 1
-            self.update_win_stats(name, aggregates["win_type"])
+            if to_bool(row["Critical Meeting Error"]):
+                self.lb.at[name, "Critical Error"] += 1
 
-        #print(f"Aggregate Win_Type: {aggregates['win_type']}")
-        if aggregates["win_type"] == "taskwin":
-            self.lb.at[name, "Task Wins"] += 1
+            if to_bool(row["Alive at Last Meeting"]):
+                self.lb.at[name, "Alive Last Meeting"] += 1
+                self.update_win_stats(name, aggregates["win_type"])
 
-        if row["Correct Votes"] >= 4:
-            self.lb.at[name, "Vote Farmer"] += 1
+            #print(f"Aggregate Win_Type: {aggregates['win_type']}")
+            if aggregates["win_type"] == "taskwin":
+                self.lb.at[name, "Task Wins"] += 1
 
-        if row["Tasks Completed"] < 10 and aggregates["win_type"] == "timesup":
-            self.lb.at[name, "Task Bozo"] += 1
+            if row["Correct Votes"] >= 4:
+                self.lb.at[name, "Vote Farmer"] += 1
 
-        # Update player stats
-        self.update_player_stats(name, aggregates)
+            if row["Tasks Completed"] < 10 and aggregates["win_type"] == "timesup":
+                self.lb.at[name, "Task Bozo"] += 1
+
+            # Update player stats
+            self.update_player_stats(name, aggregates)
 
         #Imp stats:
-        if role != "CREWMATE":
+        else:
 
             # Process all relevant updates
             #self._increment_game_count(name)
@@ -239,11 +241,11 @@ class LeaderbordCalc:
 class CrewmateCalc:
     def __init__(self):
         self.crewColumns = [
-            "Name", "CrewGames", "PPG", "First Round Victim", "√ Eject", "x Eject",
+            "Name", "Points", "CrewGames", "PPG", "First Round Victim", "√ Eject", "x Eject",
             "Eject Voting Acc", "√ Indv", "x Indv", "Indv Voting Acc.", "TCV", "Total V",
             "True VA", "Vote Farmer", "Critical Error", "Alv Last Meeting", "Throw Rate",
-            "Win Alv", "Loss Alv", "Task Bozo", "Avg Task Compl.", "Task Wins", "Points",
-            "CAP", "Total Tasks Completed", "Win % Alv"
+            "Win Alv", "Loss Alv", "Win % Alv", "Task Bozo", "Avg Task Compl.", "Task Wins", 
+            "CAP", "Total Tasks Completed",
         ]
 
         # Ensure proper types for numeric columns
@@ -415,13 +417,13 @@ class CrewmateCalc:
 class ImpostorCalc:
     def __init__(self):
         self.columns = [
-            "Name", "PPG", "Kills", "AKPG", "Ejects", "Kill Farmer",
-            "Wins", "Losses", "ImpGames", "Win % Imp", "CAP", "Points"
+            "Name", "Points", "PPG", "Kills", "AKPG", "Ejects", "Kill Farmer",
+            "Wins", "Losses", "ImpGames", "Win % Imp", "CAP"
         ]
 
         # Ensure proper types for numeric columns
         self.numeric_columns = [
-            "PPG", "Kills", "AKPG", "Ejects", "Kill Farmer", "Wins", "Losses", "ImpGames", "Win % Imp", "CAP", "Points" 
+            "Points", "PPG", "Kills", "AKPG", "Ejects", "Kill Farmer", "Wins", "Losses", "ImpGames", "Win % Imp", "CAP"
         ]
 
         self.impdf = pd.DataFrame(columns=self.columns)

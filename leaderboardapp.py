@@ -435,7 +435,18 @@ def create_report(df, crewStats, impStats, lbStats):
     all_stats[all_round_cols] = all_stats[all_round_cols].round(1)
     lb_df[lb_round_cols] = lb_df[lb_round_cols].round(1)
 
-
+    #Styling and Renaming
+    all_stats.rename(columns=
+    {
+        "PPG (crew)": "CrewPPG",
+        "Points (crew)": "CrewPoints",
+        "Alv Last Meeting": "Alive Last Meeting",
+        "CAP (crew)": "CrewCAP",
+        "PPG (imp)": "ImpPPG",
+        "Points (imp)": "ImpPoints",
+        "CAP (imp)": "ImpCAP"
+    }, inplace=True)
+    all_stats.drop(columns=["Ejects"])
 
     excel_file = f'{Path.cwd()}/calcs/leaderboard.xlsx'
     with pd.ExcelWriter(excel_file, engine='xlsxwriter') as writer:
