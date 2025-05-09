@@ -80,15 +80,19 @@ class BasePage(tk.Frame):
         base_path = Path(folder_path)
         all_files = []
 
+        #print(f"Iterating over {base_path} in update listbox")
         for file_path in base_path.rglob("*"):
             try:
+                #print(f"File_path: {file_path}")
                 if file_path.is_file():
                     filename = file_path.name
                     parsed_date = parse_date_from_filename(filename)
+                    #print(parsed_date)
                     if parsed_date:
                         all_files.append((file_path, parsed_date))
             except Exception as e:
                 print(f"Skipping file due to error: {e}")
+        #print(all_files)
 
 
 
@@ -359,9 +363,11 @@ def Calculate(folder_path, games, progress_callback=None, amountcrew="50", amoun
 
 def get_sorted_files(base_path):
     all_files = []
+    #print(f"base_path: {base_path}")
     for file_path in base_path.rglob("*"):
         if file_path.is_file():
             try:
+                print("Parsing date")
                 parsed_date = parse_date_from_filename(file_path.name)
                 if parsed_date:
                     all_files.append((file_path, parsed_date))
@@ -371,7 +377,16 @@ def get_sorted_files(base_path):
 
 def parse_date_from_filename(filename):
     try:
-        base_part = filename.split(",")[0].strip()
+        print(f"Parsing date from Filename: {filename}")
+        try:
+            base_part = filename.split(",")[0].strip()
+        except Exception as e:
+            print(f"Old parsing failed, trying new method")
+            try:
+                base_part = filename.split(",")[1].strip()
+            except Exception as e:
+                print(f"Error extracting base_part from filename '{filename}': {e}")
+
         base_part = base_part.replace("..", ".")
         dt = datetime.strptime(base_part, "%b.%d.%H.%M")
         dt = dt.replace(year=datetime.now().year)
@@ -483,32 +498,12 @@ def create_report(df, crewStats, impStats, lbStats):
         apply_percent_format(writer, all_stats, 'allstats', percent_cols_all)
         apply_percent_format(writer, lb_df, 'leaderboard', percent_cols_all)
         
-        # Auto adjust column widths
-        auto_adjust_column_widths(writer, crewdf, "crewstats")
-        auto_adjust_column_widths(writer, imp_df, "impstats")
-        auto_adjust_column_widths(writer, all_stats, "allstats")
-        auto_adjust_column_widths(writer, lb_df, "leaderboard")
-
         add_autofilter(writer, crewdf, imp_df, all_stats, lb_df)
 
 def convert_percent_columns(df, percent_cols):
     for col in percent_cols:
         if col in df.columns and df[col].max() > 1:
             df[col] = df[col] / 100
-
-def auto_adjust_column_widths(writer, df, sheet_name):
-    worksheet = writer.sheets[sheet_name]
-
-    # Handle index (column 0)
-    index_col_width = max([len(str(s)) for s in df.index.values] + [len(df.index.name or "")]) + 2
-    worksheet.set_column(0, 0, index_col_width)
-
-    # Handle data columns
-    for i, col in enumerate(df.columns):
-        col_data = df[col].astype(str).values
-        max_len = max([len(str(s)) for s in col_data] + [len(col)]) + 2  # padding
-        worksheet.set_column(i + 1, i + 1, max_len)
-
 
 def apply_percent_format(writer, df, sheet_name, percent_cols):
     workbook = writer.book
@@ -534,31 +529,3 @@ def add_autofilter(writer, crewdf, imp_df, all_stats, lb_df):
     impworksheet.autofilter(0, 0, imp_df.shape[0], imp_df.shape[1])
     allworksheet.autofilter(0, 0, all_stats.shape[0], all_stats.shape[1])
     lbworksheet.autofilter(0, 0, lb_df.shape[0], lb_df.shape[1])
-
-def parse_date_from_filename(filename):
-    try:
-        # Step 1: Extract the date portion (before the first comma)
-        date_str = filename.split(",")[0].strip()
-
-        # Step 2: Replace '..' with '.' and normalize spacing
-        date_str = date_str.replace("..", ".").replace("_", " ").strip()
-
-        # Step 3: Convert things like 'apr.01.07.51' -> 'apr 01 07:51'
-        # Match pattern: month.day.hour.minute
-        parts = date_str.split('.')
-        if len(parts) >= 4:
-            # Format as: 'month day hour:minute' -> easier for dateparser
-            date_str = f"{parts[0]} {parts[1]} {parts[2]}:{parts[3]}"
-
-        # Step 4: Parse using dateparser
-        dt = dateparser.parse(date_str, settings={
-            'PREFER_DATES_FROM': 'past',
-            'RELATIVE_BASE': datetime.now(),
-            'DATE_ORDER': 'DMY'
-        })
-
-        return dt
-
-    except Exception as e:
-        print(f"[Error parsing date] '{filename}': {e}")
-        return None
