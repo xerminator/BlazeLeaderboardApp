@@ -8,6 +8,7 @@ from datetime import datetime
 import numpy as np
 import dateparser
 import traceback
+from normalizemonths import normalize_month
 
 class LeaderboardApp(tk.Tk):
     def __init__(self):
@@ -81,23 +82,29 @@ class BasePage(tk.Frame):
         all_files = []
 
         #print(f"Iterating over {base_path} in update listbox")
-        for file_path in base_path.rglob("*"):
+        for file_path in base_path.rglob("*.csv"):
             try:
                 #print(f"File_path: {file_path}")
                 if file_path.is_file():
                     filename = file_path.name
                     parsed_date = parse_date_from_filename(filename)
+                    parsed_matchId = parse_match_id_from_filename(filename)
                     #print(parsed_date)
-                    if parsed_date:
+                    # if (parsed_date and parsed_matchId) and parsed_matchId not in all_files:
+                    #     all_files.append((file_path, parsed_date, parsed_matchId))
+                    if (parsed_date and parsed_matchId) and not any(parsed_matchId == allFilesTuple[2] for allFilesTuple in all_files if len(allFilesTuple) > 2):
+                        all_files.append((file_path, parsed_date, parsed_matchId))
+                    elif (parsed_date and parsed_matchId) and any(parsed_matchId == allFilesTuple[2] for allFilesTuple in all_files if len(allFilesTuple) > 2):
+                        print(f"Found a duplicate match for path {file_path} on matchId: {parsed_matchId} | filename: {filename}")
+                    elif parsed_date:
                         all_files.append((file_path, parsed_date))
             except Exception as e:
                 print(f"Skipping file due to error: {e}")
         #print(all_files)
 
 
-
         sorted_files = sorted(all_files, key=lambda x: x[1])
-        for path_obj, ctime in sorted_files:
+        for (path_obj, ctime, *matchId) in sorted_files:
             filename = path_obj.name
             #human_time = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(ctime))
             human_time = ctime.strftime('%Y-%m-%d %H:%M:%S')
@@ -279,7 +286,10 @@ def Calculate(folder_path, games, progress_callback=None, amountcrew="50", amoun
     rows = []
     current_progress = 0
 
+    
+
     for idx, (file_path, _) in enumerate(all_files):
+        
         print(f"Iterating: {Path(file_path).name}")
 
         if Path(file_path).name not in games:
@@ -364,32 +374,52 @@ def Calculate(folder_path, games, progress_callback=None, amountcrew="50", amoun
 def get_sorted_files(base_path):
     all_files = []
     #print(f"base_path: {base_path}")
-    for file_path in base_path.rglob("*"):
+    for file_path in base_path.rglob("*.csv"):
         if file_path.is_file():
             try:
                 print("Parsing date")
+                
+                parsed_matchId = parse_match_id_from_filename(file_path.name)
                 parsed_date = parse_date_from_filename(file_path.name)
                 if parsed_date:
                     all_files.append((file_path, parsed_date))
+                elif parsed_date and parsed_matchId:
+                    all_files.append((file_path, parsed_date, parsed_matchId))
             except Exception as e:
                 print(f"Skipping file due to error: {e}")
     return sorted(all_files, key=lambda x: x[1])
+
+def parse_match_id_from_filename(filename):
+    try:
+        part = filename.split(",")[0].strip()
+        if(len(part) == 11 and '.' not in part):
+            return part
+        else:
+            return None
+    except Exception as e:
+        print(f"Error parsing match id")
 
 def parse_date_from_filename(filename):
     try:
         print(f"Parsing date from Filename: {filename}")
         try:
             base_part = filename.split(",")[0].strip()
+            base_part = base_part.replace("..", ".")
+            base_part = normalize_month(base_part)
+            dt = datetime.strptime(base_part, "%b.%d.%H.%M")
         except Exception as e:
             print(f"Old parsing failed, trying new method")
             try:
                 base_part = filename.split(",")[1].strip()
+                if '..' in base_part:
+                    print(f"Found double dots, replacing with single")
+                    base_part = base_part.replace("..", ".")
+                print(f"base_part: {base_part}")
+                base_part = normalize_month(base_part)
+                dt = datetime.strptime(base_part, "%b.%d.%H.%M")
+                dt = dt.replace(year=datetime.now().year)
             except Exception as e:
                 print(f"Error extracting base_part from filename '{filename}': {e}")
-
-        base_part = base_part.replace("..", ".")
-        dt = datetime.strptime(base_part, "%b.%d.%H.%M")
-        dt = dt.replace(year=datetime.now().year)
         return dt
     except Exception as e:
         print(f"Error parsing date from filename '{filename}': {e}")
@@ -407,33 +437,96 @@ def clean_column_data(df):
     for column in columns_to_clean:
         df[column] = df[column].apply(lambda x: str(x).upper().strip())
 
-def create_report(df, crewStats, impStats, lbStats):
-    crewdf = crewStats.getCrewDf().drop(columns=["Total Tasks Completed"])
-    imp_df = impStats.impdf
-    lb_df = lbStats.getLeaderboardDf().drop(columns=["Total Tasks Completed"])
+def add_suffix_to_overlap_columns(df1, df2, suffix1, suffix2):
+    # Find common columns
+    common_columns = df1.columns.intersection(df2.columns)
+    
+    # Rename columns in df2 with suffixes
+    df2 = df2.rename(columns={col: col + f" ({suffix2})" for col in common_columns})
+    
+    # Rename columns in df1 with suffixes if they are common
+    df1 = df1.rename(columns={col: col + f" ({suffix1})" for col in common_columns})
+    
+    return df1, df2
 
-    all_stats = pd.merge(
-        crewdf,
-        imp_df,
-        left_index=True,
-        right_index=True,
-        how='outer',
-        suffixes=(" (crew)", " (imp)")
-    ).fillna(0)
+def create_report(df, crewStats, impStats, lbStats):
+    crewdf = crewStats.getCrewDf().drop(columns=["Total Tasks Completed", "Total Survival"])
+    imp_df = impStats.impdf
+    lb_df = lbStats.getLeaderboardDf().drop(columns=["Total Tasks Completed", "Total Survival"])
+    
+    #crewdf.index = imp_df.index.str.strip().str.lower()
+    #imp_df.index = crewdf.index.str.strip().str.lower()
+
+    crewdf["Name"] = crewdf.index
+    imp_df["Name"] = imp_df.index
+    crewdf.set_index("Name", inplace=True)
+    imp_df.set_index("Name", inplace=True)
+
+    # all_stats = pd.merge(
+    #     crewdf,
+    #     imp_df,
+    #     how='outer',
+    #     left_index=True,
+    #     right_index=True,
+    #     suffixes=(" (crew)", " (imp)")
+    # ).fillna(0)
+
+    print("Crewdf Index:")
+    print(crewdf.index)
+    print("Imp_df Index:")
+    print(imp_df.index)
+
+    # 1. Check if indexes match exactly
+    indexes_match = crewdf.index.equals(imp_df.index)
+    print(f"Indexes match exactly: {indexes_match}")
+
+    # 2. Get common indexes
+    common_indexes = crewdf.index.intersection(imp_df.index)
+    print(f"Common indexes: {common_indexes}")
+
+    # 3. Get non-matching indexes
+    crewdf_non_matching = crewdf.index.difference(imp_df.index)
+    imp_df_non_matching = imp_df.index.difference(crewdf.index)
+    print(f"Indexes in crewdf not in imp_df: {crewdf_non_matching}")
+    print(f"Indexes in imp_df not in crewdf: {imp_df_non_matching}")
+
+    # 4. Check if indexes have the same values but are in different order
+    indexes_same_values = sorted(crewdf.index) == sorted(imp_df.index)
+    print(f"Indexes have the same values (but possibly different order): {indexes_same_values}")
+
+    # 5. Check for duplicates in indexes
+    crewdf_duplicates = crewdf.index.duplicated().sum()
+    imp_df_duplicates = imp_df.index.duplicated().sum()
+    print(f"Duplicates in crewdf index: {crewdf_duplicates}")
+    print(f"Duplicates in imp_df index: {imp_df_duplicates}")
+
+    allcrewdf, allimpdf = add_suffix_to_overlap_columns(crewdf, imp_df, "crew", "imp")
+    #all_stats = pd.concat([allcrewdf, allimpdf], axis=1, join="outer")
+    all_stats = pd.merge(allcrewdf, allimpdf, how="left", left_index=True, right_index=True)
+
+    #print(crewdf)
+    #print(imp_df)
+    print(all_stats)
+
 
     all_stats["Games"] = all_stats["CrewGames"] + all_stats["ImpGames"]
     all_stats["Final CAP"] = all_stats["CAP (crew)"] + all_stats["CAP (imp)"]
 
-    crewexclude_cols = ["Avg Task Compl.","CAP", "PPG"]
+    crewexclude_cols = ["Avg Task Compl.","CAP", "PPG", "Survivability"]
     impexclude_cols = ["CAP", "PPG", "AKPG"]
-    allexclude_cols = ["PPG (crew)", "PPG (imp)", "AKPG", "CAP (crew)", "CAP (imp)", "Avg Task Compl.", "Final CAP"]
-    lbexclude_cols = ["CrewPPG", "ImpPPG", "AKPG", "CrewCAP", "ImpCAP", "Avg Task Compl.", "Final CAP"]
+    allexclude_cols = ["PPG (crew)", "PPG (imp)", "AKPG", "CAP (crew)", "CAP (imp)", "Avg Task Compl.", "Final CAP", "Survivability"]
+    lbexclude_cols = ["CrewPPG", "ImpPPG", "AKPG", "CrewCAP", "ImpCAP", "Avg Task Compl.", "Final CAP", "Survivability"]
 
     crewnumeric_cols = crewdf.select_dtypes(include=[np.number]).columns.difference(crewexclude_cols)
     impnumeric_cols = imp_df.select_dtypes(include=[np.number]).columns.difference(impexclude_cols)
     allnumeric_cols = all_stats.select_dtypes(include=[np.number]).columns.difference(allexclude_cols)
     lbnumeric_cols = lb_df.select_dtypes(include=[np.number]).columns.difference(lbexclude_cols)
 
+    crewdf[crewnumeric_cols] = crewdf[crewnumeric_cols].fillna(0)
+    imp_df[impnumeric_cols] = imp_df[impnumeric_cols].fillna(0)
+    all_stats[allnumeric_cols] = all_stats[allnumeric_cols].fillna(0)
+    lb_df[lbnumeric_cols] = lb_df[lbnumeric_cols].fillna(0)
+    
     crewdf[crewnumeric_cols] = np.floor(crewdf[crewnumeric_cols]).astype(int)
     imp_df[impnumeric_cols] = np.floor(imp_df[impnumeric_cols]).astype(int)
     all_stats[allnumeric_cols] = np.floor(all_stats[allnumeric_cols]).astype(int)
@@ -461,25 +554,27 @@ def create_report(df, crewStats, impStats, lbStats):
         "Points (imp)": "ImpPoints",
         "CAP (imp)": "ImpCAP"
     }, inplace=True)
-    all_stats.drop(columns=["Ejects"], inplace=True)
+    #all_stats.drop(columns=["Ejects"], inplace=True)
 
     percent_cols_crew = [
         'Eject Voting Acc',
-        'Indv Voting Acc',
+        'Indv Voting Acc.',
         'True VA',
         'Throw Rate',
-        'Win % Alv'
+        'Win % Alv',
+        'Survived till last meeting'
     ]
     percent_cols_imp = [
         'Win % Imp'
     ]
     percent_cols_all = [
         'Eject Voting Acc',
-        'Indv Voting Acc',
+        'Indv Voting Acc.',
         'True VA',
         'Throw Rate',
         'Win % Alv',
-        'Win %'
+        'Win % Imp',
+        'Survived till last meeting'
     ]
     convert_percent_columns(crewdf, percent_cols_crew)
     convert_percent_columns(imp_df, percent_cols_imp)

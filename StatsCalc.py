@@ -4,12 +4,12 @@ from datetime import datetime
 class LeaderbordCalc:
     def __init__(self):
         self.leaderboardColumns = [
-            "CrewPoints", "CrewGames", "CrewPPG", "First Round Victim", 
+            "CrewPoints", "CrewGames", "Survivability", "Survived till last meeting", "CrewPPG", "First Round Victim", 
             "√ Eject", "x Eject", "Eject Voting Acc", "√ Indv", "x Indv", "Indv Voting Acc.",
             "TCV", "Total V", "True VA", "Vote Farmer", "Critical Error", "Alive Last Meeting",
             "Throw Rate", "Win Alv", "Loss Alv", "Win % Alv", "Task Bozo", "Avg Task Compl.",
             "Task Wins", "CrewCAP", "ImpPoints", "ImpPPG", "Kills", "AKPG", "Kill Farmer", "Wins", "Losses", "ImpGames", "Win % Imp",
-            "ImpCAP", "Games", "Final CAP", "Total Tasks Completed", "Name"
+            "ImpCAP", "Games", "Final CAP", "Total Tasks Completed", "Name", "Total Survival"
         ]
         self.lb = pd.DataFrame(columns=self.leaderboardColumns)
         self.lb.set_index("Name", inplace=True)
@@ -21,7 +21,7 @@ class LeaderbordCalc:
             "TCV", "Total V", "True VA", "Vote Farmer", "Critical Error", "Alive Last Meeting",
             "Throw Rate", "Win Alv", "Loss Alv", "Win % Alv", "Task Bozo", "Avg Task Compl.",
             "Task Wins", "CrewCAP", "ImpPoints", "ImpPPG", "Kills", "AKPG", "Kill Farmer", "Wins", "Losses", "ImpGames", "Win % Imp",
-            "ImpCAP", "Games", "Final CAP", "Total Tasks Completed"
+            "ImpCAP", "Games", "Final CAP", "Total Tasks Completed", "Total Survival", "Survivability", "Survived till last meeting"
         ]
         self.lb[numeric_columns] = self.lb[numeric_columns].apply(pd.to_numeric, errors='coerce')
 
@@ -68,7 +68,8 @@ class LeaderbordCalc:
                 "incorrect_votes": row["Incorrect Votes"],
                 "first_victim": int(to_bool(row["First Two Victims R1"])),
                 "tasks_completed": row["Tasks Completed"],
-                "win_type": str(row["Win Type"]).strip().lower()
+                "win_type": str(row["Win Type"]).strip().lower(),
+                "survivability": row["Survivability"]
             }
 
             if to_bool(row["Critical Meeting Error"]):
@@ -118,6 +119,7 @@ class LeaderbordCalc:
         self.lb.at[name, "√ Indv"] += aggregates["correct_votes"] - aggregates["correct_ejects"]
         self.lb.at[name, "x Indv"] += aggregates["incorrect_votes"] - aggregates["incorrect_ejects"]
         self.lb.at[name, "Total Tasks Completed"] += aggregates["tasks_completed"]
+        self.lb.at[name, "Total Survival"] += aggregates["survivability"]
 
         self.calculate_advanced_stats(name)
 
@@ -125,6 +127,7 @@ class LeaderbordCalc:
         total_votes = self.lb.at[name, "Total V"]
         total_ejects = self.lb.at[name, "√ Eject"] + self.lb.at[name, "x Eject"]
         total_indv = self.lb.at[name, "√ Indv"] + self.lb.at[name, "x Indv"]
+        total_survival = self.lb.at[name, "Total Survival"]
 
         self.update_accuracy(name, total_votes, total_ejects, total_indv)
         self.calculate_points(name)
@@ -132,6 +135,7 @@ class LeaderbordCalc:
         self.calculate_task_avg(name)
         self.calculate_throw_rate(name)
         self.calculate_win_alv_percentage(name)
+        self.calculate_survival(name, total_survival)
         self.calculate_cap(name)
         self._calculate_final_stats(name)
 
@@ -182,6 +186,10 @@ class LeaderbordCalc:
         #print(f"Total Alive: {total_alv}")
         if total_alv > 0:
             self.lb.at[name, "Win % Alv"] = round(self.lb.at[name, "Win Alv"] / total_alv * 100, 2)
+
+    def calculate_survival(self, name, total_survival):
+        self.lb.at[name, "Survivability"] = total_survival / self.lb.at[name, "CrewGames"]
+        self.lb.at[name, "Survived till last meeting"] = round(self.lb.at[name, "Alive Last Meeting"] / self.lb.at[name, "CrewGames"] * 100, 2)
 
     def calculate_cap(self, name):
         cap = (
@@ -241,11 +249,11 @@ class LeaderbordCalc:
 class CrewmateCalc:
     def __init__(self):
         self.crewColumns = [
-            "Name", "Points", "CrewGames", "PPG", "First Round Victim", "√ Eject", "x Eject",
+            "Name", "Points", "CrewGames", "Survivability", "Survived till last meeting", "PPG", "First Round Victim", "√ Eject", "x Eject",
             "Eject Voting Acc", "√ Indv", "x Indv", "Indv Voting Acc.", "TCV", "Total V",
             "True VA", "Vote Farmer", "Critical Error", "Alv Last Meeting", "Throw Rate",
             "Win Alv", "Loss Alv", "Win % Alv", "Task Bozo", "Avg Task Compl.", "Task Wins", 
-            "CAP", "Total Tasks Completed",
+            "CAP", "Total Tasks Completed", "Total Survival"
         ]
 
         # Ensure proper types for numeric columns
@@ -253,7 +261,7 @@ class CrewmateCalc:
             "CrewGames", "PPG", "First Round Victim", "√ Eject", "x Eject", "Eject Voting Acc",
             "√ Indv", "x Indv", "Indv Voting Acc.", "TCV", "Total V", "True VA", "Vote Farmer",
             "Critical Error", "Alv Last Meeting", "Throw Rate", "Win Alv", "Loss Alv", "Task Bozo",
-            "Avg Task Compl.", "Task Wins", "Points", "CAP", "Total Tasks Completed", "Win % Alv"
+            "Avg Task Compl.", "Task Wins", "Points", "CAP", "Total Tasks Completed", "Win % Alv", "Total Survival", "Survivability", "Survived till last meeting"
         ]
 
         self.crewdf = pd.DataFrame(columns=self.crewColumns)
@@ -273,7 +281,7 @@ class CrewmateCalc:
         #print(df.to_markdown())
 
         row = df.iloc[0]
-        name = row["Name"]
+        name = str(row["Name"]).strip()
 
         # Initialize player if not already present
         if name not in self.crewdf.index:
@@ -300,7 +308,8 @@ class CrewmateCalc:
             "incorrect_votes": row["Incorrect Votes"],
             "first_victim": int(to_bool(row["First Two Victims R1"])),
             "tasks_completed": row["Tasks Completed"],
-            "win_type": str(row["Win Type"]).strip().lower()
+            "win_type": str(row["Win Type"]).strip().lower(),
+            "survivability": row["Survivability"]
         }
 
         if to_bool(row["Critical Meeting Error"]):
@@ -318,7 +327,7 @@ class CrewmateCalc:
             self.crewdf.at[name, "Vote Farmer"] += 1
 
         if row["Tasks Completed"] < 10 and aggregates["win_type"] == "timesup":
-            self.crewdf.at[name, "Task Bozo"] += 1
+            self.crewdf.at[name, "Task Bozo"] += 1 
 
         # Increment CrewGames directly
         self.crewdf.at[name, "CrewGames"] += 1
@@ -341,6 +350,7 @@ class CrewmateCalc:
         self.crewdf.at[name, "√ Indv"] += aggregates["correct_votes"] - aggregates["correct_ejects"]
         self.crewdf.at[name, "x Indv"] += aggregates["incorrect_votes"] - aggregates["incorrect_ejects"]
         self.crewdf.at[name, "Total Tasks Completed"] += aggregates["tasks_completed"]
+        self.crewdf.at[name, "Total Survival"] += aggregates["survivability"]
 
         self.calculate_advanced_stats(name)
 
@@ -348,6 +358,7 @@ class CrewmateCalc:
         total_votes = self.crewdf.at[name, "Total V"]
         total_ejects = self.crewdf.at[name, "√ Eject"] + self.crewdf.at[name, "x Eject"]
         total_indv = self.crewdf.at[name, "√ Indv"] + self.crewdf.at[name, "x Indv"]
+        total_survival = self.crewdf.at[name, "Total Survival"]
 
         self.update_accuracy(name, total_votes, total_ejects, total_indv)
         self.calculate_points(name)
@@ -355,6 +366,7 @@ class CrewmateCalc:
         self.calculate_task_avg(name)
         self.calculate_throw_rate(name)
         self.calculate_win_alv_percentage(name)
+        self.calculate_survival(name, total_survival)
         self.calculate_cap(name)
 
     def update_accuracy(self, name, total_votes, total_ejects, total_indv):
@@ -404,6 +416,10 @@ class CrewmateCalc:
         #print(f"Total Alive: {total_alv}")
         if total_alv > 0:
             self.crewdf.at[name, "Win % Alv"] = round(self.crewdf.at[name, "Win Alv"] / total_alv * 100, 2)
+    
+    def calculate_survival(self, name, total_survival):
+        self.crewdf.at[name, "Survivability"] = total_survival / self.crewdf.at[name, "CrewGames"]
+        self.crewdf.at[name, "Survived till last meeting"] = round(self.crewdf.at[name, "Alv Last Meeting"] / self.crewdf.at[name, "CrewGames"] * 100, 2)
 
     def calculate_cap(self, name):
         cap = (
@@ -504,21 +520,6 @@ class ImpostorCalc:
             self.impdf.at[name, "Win % Imp"] / 100
         )
         self.impdf.at[name, "CAP"] = round(cap, 1)
-    
-class GameManager:
-    def __init__(self):
-        self.games = []
-    
-    def add_game(self, df):
-        game = Game(df)
-        self.games.append()
-
-class Game:
-    def __init__(self, df):
-        self.players = []
-        self.starttime = datetime.now()
-        self.imps = []
-        self.crew = []
 
 def to_bool(val):
     if isinstance(val, bool):
