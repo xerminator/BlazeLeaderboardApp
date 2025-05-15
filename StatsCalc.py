@@ -8,7 +8,7 @@ class LeaderbordCalc:
             "√ Eject", "x Eject", "Eject Voting Acc", "√ Indv", "x Indv", "Indv Voting Acc.",
             "TCV", "Total V", "True VA", "Vote Farmer", "Critical Error", "Alive Last Meeting",
             "Throw Rate", "Win Alv", "Loss Alv", "Win % Alv", "Task Bozo", "Avg Task Compl.",
-            "Task Wins", "CrewCAP", "ImpPoints", "ImpPPG", "Kills", "AKPG", "Kill Farmer", "Wins", "Losses", "ImpGames", "Win % Imp",
+            "Task Wins", "CrewCAP", "ImpPoints", "ImpPPG", "Kills", "AKPG", "Kill Farmer", "Ejects", "Wins", "Losses", "ImpGames", "Win % Imp",
             "ImpCAP", "Games", "Final CAP", "Total Tasks Completed", "Name", "Total Survival"
         ]
         self.lb = pd.DataFrame(columns=self.leaderboardColumns)
@@ -21,7 +21,7 @@ class LeaderbordCalc:
             "TCV", "Total V", "True VA", "Vote Farmer", "Critical Error", "Alive Last Meeting",
             "Throw Rate", "Win Alv", "Loss Alv", "Win % Alv", "Task Bozo", "Avg Task Compl.",
             "Task Wins", "CrewCAP", "ImpPoints", "ImpPPG", "Kills", "AKPG", "Kill Farmer", "Wins", "Losses", "ImpGames", "Win % Imp",
-            "ImpCAP", "Games", "Final CAP", "Total Tasks Completed", "Total Survival", "Survivability", "Survived till last meeting"
+            "ImpCAP", "Games", "Final CAP", "Total Tasks Completed", "Total Survival", "Survivability", "Survived till last meeting", "Ejects"
         ]
         self.lb[numeric_columns] = self.lb[numeric_columns].apply(pd.to_numeric, errors='coerce')
 
@@ -98,7 +98,7 @@ class LeaderbordCalc:
             # Process all relevant updates
             #self._increment_game_count(name)
             self._update_kills(name, row)
-            #self._update_ejects(name, row)
+            self._update_ejects(name, row)
             self._update_win_loss(name, row)
             self._update_points(name)
             self._calculate_derived_stats(name)
@@ -206,8 +206,8 @@ class LeaderbordCalc:
         if kills >= 4:
             self.lb.at[name, "Kill Farmer"] += 1
 
-    # def _update_ejects(self, name, row):
-    #     self.lb.at[name, "Ejects"] += row["Number of Crewmates Ejected (Imposter Only)"]
+    def _update_ejects(self, name, row):
+        self.lb.at[name, "Ejects"] += row["Number of Crewmates Ejected (Imposter Only)"]
 
     def _update_win_loss(self, name, row):
         win_type = str(row["Win Type"]).strip().lower()
@@ -221,7 +221,7 @@ class LeaderbordCalc:
             self.lb.at[name, "Wins"] * 5
             - self.lb.at[name, "Losses"] * 0.5
             + self.lb.at[name, "Kills"] * 0.25
-            #+ self.lb.at[name, "Ejects"] * 0.25
+            + self.lb.at[name, "Ejects"] * 0.25
         )
         self.lb.at[name, "ImpPoints"] = round(points, 2)
 
